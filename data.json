@@ -2,7 +2,7 @@
   "version": 1,
   "config": {
     "centsPerPoint": 25,
-    "weeklyGoalCents": 700,
+    "baselineCents": 1000,
     "timezone": "America/Los_Angeles"
   },
   "cycle": {

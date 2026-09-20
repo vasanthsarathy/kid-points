@@ -228,10 +228,10 @@ button { font: inherit; cursor: pointer; }
 }
 
 .pips i.gap { margin-right: 9px; }
+/* Lit = money in hand, dark = money lost this week, gold = bonus on top. */
 .pips i.on { background: var(--kid); }
-.pips i.off { background: transparent; border: 1.5px solid color-mix(in srgb, var(--kid) 28%, var(--line)); }
+.pips i.lost { background: transparent; border: 2px solid color-mix(in srgb, var(--danger) 55%, transparent); }
 .pips i.over { background: var(--owed); }
-.pips i.owe { background: transparent; border: 2px solid var(--danger); }
 .pips b { font-size: .75rem; color: var(--muted); font-weight: 600; align-self: center; }
 
 @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
@@ -352,22 +352,51 @@ button { font: inherit; cursor: pointer; }
 .controls .plus { color: var(--kid); }
 .controls .minus { color: var(--muted); }
 
-.status { margin: 14px 0 0; padding: 10px 16px; font-size: .8125rem; border-top: 1px solid var(--line); }
+/* Pinned to the bottom so cards in a row line their money up. */
+.statuses { margin-top: auto; }
+
+.status {
+  margin: 0;
+  padding: 10px 16px;
+  font-size: .8125rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .status.is-owed { background: var(--owed-bg); color: var(--owed-ink); font-weight: 600; }
 .status.is-clear { color: var(--muted); }
 .status .money { font-family: var(--display); font-weight: 600; }
-.status button {
-  margin-top: 8px;
-  display: block;
-  width: 100%;
+
+.paybtn {
+  margin-left: auto;
   border: 1px solid var(--owed);
   background: transparent;
   color: var(--owed-ink);
   border-radius: 10px;
-  padding: 7px 0;
-  font-size: .8125rem;
+  padding: 5px 12px;
+  font-size: .75rem;
   font-weight: 600;
+  white-space: nowrap;
 }
+
+.paybtn:hover { background: color-mix(in srgb, var(--owed) 22%, transparent); }
+
+.cardtools { display: flex; justify-content: flex-end; margin: 8px 16px 0; }
+
+.tool {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: var(--muted);
+  font-size: .75rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tool:hover { color: var(--danger); }
 
 /* ---------- paid history ---------- */
 

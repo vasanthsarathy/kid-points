@@ -5,6 +5,7 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_MS = 86400000;
 const PAYOUTS_KEPT = 12;
+const DEFAULT_BASELINE_CENTS = 1000;
 
 // Dates are handled as UTC midnights so daylight saving never shifts a day.
 const toUTC = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
@@ -42,9 +43,25 @@ export function fmtRange(startIso, endIso) {
   return `${fmtDay(startIso)} – ${fmtDay(endIso)}`;
 }
 
-/** A week in the hole is worth nothing, never a debt. */
-export function centsFor(points, centsPerPoint) {
-  return Math.max(0, points) * centsPerPoint;
+/* ---------------- money ---------------- */
+
+export const baselineCents = config => config.baselineCents ?? DEFAULT_BASELINE_CENTS;
+
+/**
+ * Every week starts at the guaranteed allowance; points move it either way.
+ * It can reach zero but never turns into a debt the kid owes back.
+ */
+export function centsFor(points, config) {
+  return Math.max(0, baselineCents(config) + points * config.centsPerPoint);
+}
+
+export function formatMoney(cents) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+/** How many dots make up the guaranteed allowance — one per point's worth. */
+export function baselineSlots(config) {
+  return Math.max(1, Math.round(baselineCents(config) / config.centsPerPoint));
 }
 
 /* ---------------- the game ---------------- */
@@ -57,12 +74,6 @@ export const TIERS = [
   { at: 40, name: 'Champion', emoji: '🏆', color: '#d9683a' },
   { at: 50, name: 'Legend', emoji: '👑', color: '#a755d6' },
 ];
-
-/** How many points make the weekly goal at the current rate. */
-export function goalPoints(config) {
-  const goalCents = config.weeklyGoalCents ?? 700;
-  return Math.max(1, Math.ceil(goalCents / config.centsPerPoint));
-}
 
 /** 0 through TIERS.length — how many rungs are cleared. */
 export function tierLevel(points) {
@@ -84,21 +95,48 @@ export function nextTier(points) {
  * not only the parent who tapped the button.
  */
 export function milestones(state, kid) {
-  const goal = goalPoints(state.config);
   return {
     tier: tierLevel(kid.points),
-    goal: kid.points >= goal ? 1 : 0,
+    bonus: kid.points > 0 ? 1 : 0,
     best: kid.points > 0 && kid.points > (kid.best || 0) ? 1 : 0,
     streak: kid.streak || 0,
   };
 }
 
-export function formatMoney(cents) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+/* ---------------- cycles ---------------- */
 
 export function nextPayday(state) {
   return addDays(state.cycle.startDate, 7);
+}
+
+/**
+ * Bring a file written by an older version up to date. Payments used to be
+ * recorded per week; they are now per kid, so each kid inherits whatever the
+ * week already said and nothing already marked paid comes back.
+ */
+export function migrate(state) {
+  const next = structuredClone(state);
+
+  next.config.baselineCents = baselineCents(next.config);
+  delete next.config.weeklyGoalCents;
+
+  for (const kid of next.kids) {
+    kid.best = kid.best || 0;
+    kid.streak = kid.streak || 0;
+  }
+
+  for (const payout of next.payouts) {
+    for (const share of Object.values(payout.kids)) {
+      if (share.paid === undefined) {
+        share.paid = payout.paid === true || share.cents === 0;
+        share.paidOn = share.paid ? (payout.paidOn || payout.id) : null;
+      }
+    }
+    delete payout.paid;
+    delete payout.paidOn;
+  }
+
+  return next;
 }
 
 /**
@@ -116,28 +154,21 @@ export function rollForward(state, today) {
   // Ten years of weeks — a corrupt future date can't spin this forever.
   for (let guard = 0; guard < 520 && today >= addDays(next.cycle.startDate, 7); guard++) {
     const weekStart = next.cycle.startDate;
-    const goal = goalPoints(next.config);
+    const payday = addDays(weekStart, 7);
     const kids = {};
+
     for (const kid of next.kids) {
-      kids[kid.id] = { points: kid.points, cents: centsFor(kid.points, next.config.centsPerPoint) };
+      const cents = centsFor(kid.points, next.config);
+      // A kid who dug far enough to owe nothing has nothing to collect either.
+      kids[kid.id] = { points: kid.points, cents, paid: cents === 0, paidOn: cents === 0 ? payday : null };
       // Records outlive the payout list, which gets pruned.
       kid.best = Math.max(kid.best || 0, kid.points);
-      kid.streak = kid.points >= goal ? (kid.streak || 0) + 1 : 0;
+      kid.streak = kid.points > 0 ? (kid.streak || 0) + 1 : 0;
       kid.points = 0;
     }
-    // A week where nobody earned anything is not a debt, so it settles itself
-    // rather than sitting in the "not paid yet" list forever.
-    const payday = addDays(weekStart, 7);
-    const owed = Object.values(kids).some(k => k.cents > 0);
-    next.payouts.push({
-      id: payday,
-      weekStart,
-      weekEnd: addDays(weekStart, 6),
-      kids,
-      paid: !owed,
-      paidOn: owed ? null : payday,
-    });
-    next.cycle.startDate = addDays(weekStart, 7);
+
+    next.payouts.push({ id: payday, weekStart, weekEnd: addDays(weekStart, 6), kids });
+    next.cycle.startDate = payday;
     changed = true;
   }
 
@@ -145,20 +176,48 @@ export function rollForward(state, today) {
   return { state: next, changed };
 }
 
-/** Keeps the file small, but an unpaid week is a debt and is never forgotten. */
+/* ---------------- payouts ---------------- */
+
+const owes = share => share.cents > 0 && !share.paid;
+
+/** True while anyone still has money coming for this week. */
+export const weekIsOpen = payout => Object.values(payout.kids).some(owes);
+
+const byDate = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/** Keeps the file small, but a week someone is still owed is never forgotten. */
 export function prunePayouts(payouts, keep = PAYOUTS_KEPT) {
-  const sorted = [...payouts].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const sorted = [...payouts].sort(byDate);
   const recent = new Set(sorted.slice(-keep).map(p => p.id));
-  return sorted.filter(p => !p.paid || recent.has(p.id));
+  return sorted.filter(p => weekIsOpen(p) || recent.has(p.id));
 }
 
+/** Weeks with money still owed to somebody, oldest first. */
 export function outstanding(state) {
-  return prunePayouts(state.payouts, Infinity).filter(p => !p.paid);
+  return [...state.payouts].sort(byDate).filter(weekIsOpen);
 }
 
-export function paidHistory(state) {
-  return prunePayouts(state.payouts, Infinity).filter(p => p.paid).reverse();
+/** Weeks where everyone has been settled, most recent first. */
+export function settled(state) {
+  return [...state.payouts].sort(byDate).reverse().filter(p => !weekIsOpen(p));
 }
+
+/** Weeks this one kid is still owed for, oldest first. */
+export function owedTo(state, kidId) {
+  return [...state.payouts].sort(byDate).filter(p => p.kids[kidId] && owes(p.kids[kidId]));
+}
+
+export function owedCents(state, kidId) {
+  return owedTo(state, kidId).reduce((sum, p) => sum + p.kids[kidId].cents, 0);
+}
+
+/** The last week this kid actually got money for. */
+export function lastPaidTo(state, kidId) {
+  return [...state.payouts].sort(byDate).reverse()
+    .find(p => p.kids[kidId]?.paid && p.kids[kidId].cents > 0) || null;
+}
+
+/* ---------------- unsaved changes ---------------- */
 
 export function emptyPending() {
   return { deltas: {}, ops: [] };
@@ -187,21 +246,32 @@ export function applyPending(state, pending) {
   return next;
 }
 
+function pay(share, on) {
+  if (share && !share.paid) { share.paid = true; share.paidOn = on; }
+}
+
 function applyOp(state, op) {
   switch (op.type) {
     case 'markPaid': {
       const payout = state.payouts.find(p => p.id === op.payoutId);
-      if (payout) { payout.paid = true; payout.paidOn = op.on; }
+      pay(payout?.kids[op.kidId], op.on);
+      break;
+    }
+    case 'markWeekPaid': {
+      const payout = state.payouts.find(p => p.id === op.payoutId);
+      for (const share of Object.values(payout?.kids || {})) pay(share, op.on);
       break;
     }
     case 'markAllPaid':
       for (const payout of state.payouts) {
-        if (!payout.paid) { payout.paid = true; payout.paidOn = op.on; }
+        for (const share of Object.values(payout.kids)) pay(share, op.on);
       }
       break;
-    case 'zeroWeek':
-      for (const kid of state.kids) kid.points = 0;
+    case 'zeroKid': {
+      const kid = state.kids.find(k => k.id === op.kidId);
+      if (kid) kid.points = 0;
       break;
+    }
     case 'startOver':
       state.payouts = [];
       for (const kid of state.kids) kid.points = 0;

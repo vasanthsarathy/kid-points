@@ -113,3 +113,42 @@ before showing the kids.
 - No per-change history. Points move, but nothing records why.
 - Payouts are marked paid a week at a time, for all three kids together, not per
   kid.
+
+## Round three — guaranteed allowance and per-kid payment
+
+- [x] `logic.js` — `baselineCents`, per-kid payment records, `migrate`, `zeroKid`
+- [x] `logic.test.js` — rewritten around the new money model, 50 passing
+- [x] `app.js` — dots as money, per-card Mark paid and Reset, Pay everyone
+- [x] `index.html` / `styles.css` — allowance setting, card tools, lost dots
+- [x] `README.md` — the new model throughout
+- [x] Headless runs rewritten on a shared boot module — 41 + 34 assertions
+
+### Round three review
+
+**Money.** A week now starts at a guaranteed `baselineCents` (default $10) and
+points move it either way, floored at $0. It takes 40 points in the hole to
+lose a whole week. `weeklyGoalCents` is gone: there is no goal to reach when
+the allowance is guaranteed.
+
+**The dots are the money.** Forty of them, one per 25¢, all lit at zero because
+the $10 is already theirs. Losing points puts them out from the end; earning
+stacks gold on past the guarantee. This inverts the old grid, which was an
+empty bar to fill, and it means the card shows what a kid stands to lose rather
+than only what they might gain.
+
+**Payment is per kid.** `payout.kids[id]` carries its own `paid` and `paidOn`,
+so E can be settled while L is not. A week counts as open while anyone is still
+owed, and pruning respects that. `migrate()` moves older week-level records
+onto each kid on read, keeping the date it was actually handed over, so nothing
+already paid comes back.
+
+**Controls moved to the cards.** Mark paid and a per-kid reset live on the card
+they affect. Settings keeps only what is genuinely global. The ledger keeps a
+`Pay everyone` per week, because Friday is usually one action.
+
+**Consequence worth remembering:** with a guaranteed allowance almost every
+week now creates a real debt, so the "empty weeks settle themselves" rule only
+fires for a kid who went 40 points under. Marking payments is now a weekly
+chore rather than an occasional one.
+
+Still unverified: how any of it looks. No browser was available.

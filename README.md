@@ -3,13 +3,13 @@
 A points board and allowance tracker for E, L and M. The kids can look at it
 any time; only you can change it.
 
-- Points reset every **Friday**. Whatever a kid finished the week with is what
-  they get paid that Friday.
-- At 25¢ a point, about 28 points in a week is about $7.
-- A week you haven't paid yet shows up as **still owed**, so a kid checking on a
-  Tuesday knows exactly where they stand.
-- Points can go negative, but a payout never goes below $0 and a bad week never
-  carries into the next one.
+**Everyone starts each week with $10.** Each point earned adds 25¢ on top;
+each point lost takes 25¢ off. A week can fall to $0 but never becomes a debt
+the kid owes back — it takes 40 points in the hole to lose the whole allowance.
+
+Weeks run Friday to Thursday and are paid the following Friday. A week you
+haven't handed over yet shows as **still owed**, per kid, so a kid checking on
+a Tuesday knows exactly where they stand.
 
 ---
 
@@ -44,10 +44,40 @@ kids.
 
 **4. Unlock the site.** Open your Pages URL, tap **Parent**, paste the token,
 and pick a short password. Both stay in that browser. Do the same on any other
-device you want to change points from.
+device you want to change points from. If you ever forget the password, the
+unlock box offers to set the device up again.
 
-**5. Make it yours.** Tap **Settings** to set names, emoji and the rate, then
-open **Earn & lose** to edit the two lists.
+**5. Make it yours.** Tap **Settings** to set the weekly allowance, the rate,
+and the kids' names and emoji, then open **Earn & lose** to edit the two lists.
+
+---
+
+## The game
+
+The dots on each card **are the money**. There is one per 25¢ of the weekly
+allowance — 40 of them — and they all start lit, because the $10 is already
+theirs. Lose points and dots go dark from the end. Earn points and gold ones
+stack on past the guarantee.
+
+There are four things to earn:
+
+| | What it takes |
+|---|---|
+| 🌱 ⚡ 🚀 🏆 👑 | +10, +20, +30, +40 and +50 points in a week — Sprout, Spark, Rocket, Champion, Legend. Below 10 the badge counts down instead. |
+| ✨ | The first point above the plain allowance |
+| 👑 | Beating their own best week |
+| 🔥 | Two or more weeks in a row finishing above the allowance |
+
+Crossing one sets off confetti on the card. Because the celebration is worked
+out from the score rather than from your tap, **each kid gets their own**
+confetti the first time they open the page after crossing — you are not the
+only one who sees it. Each browser keeps its own note of what it has already
+shown, so nothing fires twice and nothing is missed.
+
+Tiers reset every Friday with the points. Best and streak carry over. If a kid
+loses points and drops back under a rung, the badge quietly steps down and
+re-crossing it celebrates again. A streak ends silently — the flame just stops
+appearing — rather than announcing that a run was broken.
 
 ---
 
@@ -61,47 +91,18 @@ bottom of the screen says `Saving…` and then `Saved`.
 **Behaviors as shortcuts.** On the **Earn & lose** tab, tap a row like
 *Made your bed +2*, pick a kid, and it applies the points in one go.
 
-## The game
+**Paying out.** Every Friday the week closes on its own. Each kid's card then
+shows what they're owed with its own **Mark paid** button, so you can settle one
+kid without the others. Below the cards, each week also has **Pay everyone** for
+the usual case where all three get paid at once.
 
-The dots under each score are the game board: one slot per point needed to
-reach $7, filling in as they are earned. Anything past the goal stacks on in
-gold. An empty card reads as a chart waiting to be filled.
+**Resetting one kid.** Each card has **Reset _name_'s week**, which puts that
+kid back to 0 points — the plain allowance again — and leaves their best week,
+their streak and anything they're owed alone.
 
-There are four things to earn:
-
-| | What it takes |
-|---|---|
-| 🌱 ⚡ 🚀 🏆 👑 | 10, 20, 30, 40 and 50 points in a week — Sprout, Spark, Rocket, Champion, Legend. Below 10 the badge counts down instead. |
-| ✨ | Every slot filled, which is the $7 goal |
-| 👑 | Beating their own best week |
-| 🔥 | Two or more weeks in a row hitting the goal |
-
-Crossing one sets off confetti on the card. Because the celebration is worked
-out from the score rather than from your tap, **each kid gets their own**
-confetti the first time they open the page after crossing — you are not the
-only one who sees it. Each browser keeps its own note of what it has already
-shown, so nothing fires twice and nothing is missed.
-
-Tiers and the goal reset every Friday with the points. Best and streak carry
-over. If a kid loses points and drops back under a rung, the badge quietly
-steps down and re-crossing it celebrates again.
-
-A streak ends silently — the flame just stops appearing — rather than
-announcing that a run was broken.
-
----
-
-**Paying out.** Every Friday the week closes on its own and shows under
-**Not paid yet** with what each kid is owed. When you hand over the money, tap
-**Mark paid**. A week where nobody earned anything settles itself and never
-appears there.
-
-**Resets.** In Settings: *Zero out this week*, *Mark everything paid*, or
-*Start over*, which deletes every payout record and sets all three to zero. Your
-earn and lose lists survive all three.
-
-**If you forget the password,** clear this site's data in your browser, or open
-it in a private window. That wipes the saved token too, so paste it again.
+**Resetting everything.** Settings has *Mark everything paid* and *Start over*,
+which deletes every payout record and sets all three to zero. Your earn and lose
+lists survive both.
 
 ---
 
@@ -141,6 +142,10 @@ The weekly rollover is **derived, not scheduled**: `rollForward(state, today)`
 closes every week that has finished since the file was last touched. No server
 wakes up on Friday, and a month of nobody opening the page produces four correct
 payouts rather than one wrong one.
+
+Older files are brought forward by `migrate(state)` on read — it fills in the
+weekly allowance and moves week-level payment records onto each kid, so
+anything already marked paid stays paid.
 
 Saves are sent with the file's current `sha`. If you edited from your laptop and
 then your phone, the stale write is rejected, and the app refetches and replays

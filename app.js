@@ -1,8 +1,10 @@
 import {
   addDays, daysBetween, weekdayOf, todayIn, fmtDay, fmtRange,
-  centsFor, formatMoney, nextPayday, rollForward,
-  applyPending, emptyPending, pendingCount, outstanding, paidHistory,
-  TIERS, tierFor, nextTier, goalPoints, milestones,
+  centsFor, formatMoney, baselineCents, baselineSlots,
+  nextPayday, migrate, rollForward,
+  outstanding, settled, owedTo, lastPaidTo,
+  applyPending, emptyPending, pendingCount,
+  TIERS, tierFor, nextTier, milestones,
 } from './logic.js';
 
 /* ------------------------------------------------------------------ *
@@ -101,11 +103,13 @@ async function putState(state, message) {
 
 /* ---------------- loading ---------------- */
 
-/** Close any weeks that finished while nobody was looking. */
+/** Bring an older file up to date, then close any weeks that have finished. */
 function normalize(loaded) {
   today = todayIn(loaded.state.config.timezone || 'UTC');
-  const { state, changed } = rollForward(loaded.state, today);
-  return { loaded: { state, sha: loaded.sha }, changed };
+  const current = migrate(loaded.state);
+  const { state, changed } = rollForward(current, today);
+  const moved = changed || JSON.stringify(current) !== JSON.stringify(loaded.state);
+  return { loaded: { state, sha: loaded.sha }, changed: moved };
 }
 
 async function load() {
@@ -137,9 +141,10 @@ async function load() {
 /* ---------------- saving ---------------- */
 
 const OP_LABEL = {
-  markPaid: 'marked a week paid',
+  markPaid: 'marked one kid paid',
+  markWeekPaid: 'paid everyone for a week',
   markAllPaid: 'marked everything paid',
-  zeroWeek: 'zeroed the week',
+  zeroKid: 'reset a kid for the week',
   startOver: 'started over',
   setConfig: 'updated settings',
   setKids: 'updated the kids',
@@ -234,6 +239,7 @@ function render() {
   renderKids(state);
   renderWeeks(state);
   renderLists(state);
+  $('base').textContent = formatMoney(baselineCents(state.config));
   $('rate').textContent = `${state.config.centsPerPoint}¢`;
   $('parent-btn').textContent = unlocked ? 'Settings' : 'Parent';
   checkMilestones(state);
@@ -263,21 +269,26 @@ function renderPayday(state) {
     </div>`;
 }
 
-function kidStatus(state, kidId) {
-  const owedCents = outstanding(state).reduce((sum, p) => sum + (p.kids[kidId]?.cents || 0), 0);
-  if (owedCents > 0) {
-    const weeks = outstanding(state).filter(p => (p.kids[kidId]?.cents || 0) > 0);
-    const forWhat = weeks.length === 1 ? `for ${fmtRange(weeks[0].weekStart, weeks[0].weekEnd)}` : `for ${weeks.length} weeks`;
-    return { cls: 'is-owed', html: `Still owed <span class="money">${formatMoney(owedCents)}</span> ${forWhat}` };
+/**
+ * One line per week this kid is still owed for, each with its own button, so
+ * one kid can be settled while their siblings are not.
+ */
+function kidStatus(state, kid) {
+  const weeks = owedTo(state, kid.id);
+  if (weeks.length) {
+    return weeks.map(p => `
+      <p class="status is-owed">
+        <span>Still owed <span class="money">${formatMoney(p.kids[kid.id].cents)}</span> for ${fmtRange(p.weekStart, p.weekEnd)}</span>
+        ${unlocked ? `<button class="paybtn" data-paid="${esc(p.id)}" data-kid="${esc(kid.id)}">Mark paid</button>` : ''}
+      </p>`).join('');
   }
-  if (outstanding(state).length) {
-    return { cls: 'is-clear', html: 'Nothing owed for last week' };
-  }
-  const last = paidHistory(state)[0];
+
+  const last = lastPaidTo(state, kid.id);
   if (last) {
-    return { cls: 'is-clear', html: `Paid <span class="money">${formatMoney(last.kids[kidId]?.cents || 0)}</span> on ${fmtDay(last.paidOn)}` };
+    const share = last.kids[kid.id];
+    return `<p class="status is-clear">Paid <span class="money">${formatMoney(share.cents)}</span> on ${fmtDay(share.paidOn)}</p>`;
   }
-  return { cls: 'is-clear', html: 'First payday coming up' };
+  return '<p class="status is-clear">First payday coming up</p>';
 }
 
 function renderKids(state) {
@@ -285,7 +296,6 @@ function renderKids(state) {
   box.innerHTML = '';
 
   state.kids.forEach((kid, index) => {
-    const status = kidStatus(state, kid.id);
     const card = document.createElement('article');
     card.className = 'kid';
     card.style.setProperty('--kid', colorOf(index));
@@ -294,15 +304,18 @@ function renderKids(state) {
         <span class="avatar">${esc(kid.emoji)}</span><h2>${esc(kid.name)}</h2>
         ${tierBadge(kid.points)}
       </div>
-      <p class="score${kid.points < 0 ? ' under' : ''}">${kid.points}</p>
-      <p class="worth">${worthLine(kid.points, state)}</p>
+      <p class="score${kid.points < 0 ? ' under' : ''}">${kid.points > 0 ? '+' : ''}${kid.points}</p>
+      <p class="worth">${worthLine(kid.points, state.config)}</p>
       <div class="pips"></div>
       <p class="trophies">${trophies(kid)}</p>
       ${unlocked ? `<div class="controls">
         <button class="minus" data-bump="-1" data-kid="${esc(kid.id)}" aria-label="Take a point from ${esc(kid.name)}">−</button>
         <button class="plus" data-bump="1" data-kid="${esc(kid.id)}" aria-label="Give ${esc(kid.name)} a point">+</button>
+      </div>
+      <div class="cardtools">
+        <button class="tool" data-zero="${esc(kid.id)}">Reset ${esc(kid.name)}'s week</button>
       </div>` : ''}
-      <p class="status ${status.cls}">${status.html}</p>`;
+      <div class="statuses">${kidStatus(state, kid)}</div>`;
     card.querySelector('.pips').append(pipsFor(kid.points, state.config, false));
     box.append(card);
   });
@@ -315,11 +328,11 @@ function tierBadge(points) {
   return next ? `<span class="tier next">${next.at - points} to ${next.name}</span>` : '';
 }
 
-function worthLine(points, state) {
-  const money = formatMoney(centsFor(points, state.config.centsPerPoint));
-  const short = goalPoints(state.config) - points;
-  if (short > 0) return `${money} so far — ${short} more for the goal`;
-  return `${money} so far — goal reached`;
+function worthLine(points, config) {
+  const money = formatMoney(centsFor(points, config));
+  if (points === 0) return `${money} this week`;
+  const moved = formatMoney(Math.abs(centsFor(points, config) - baselineCents(config)));
+  return points > 0 ? `${money} this week — ${moved} bonus` : `${money} this week — ${moved} lost`;
 }
 
 function trophies(kid) {
@@ -330,69 +343,69 @@ function trophies(kid) {
 }
 
 /**
- * The slots double as the progress bar: one per point needed for the weekly
- * goal, filling in as they are earned, with anything past the goal stacked on
- * in gold. One row of dots carries the exact count and the distance to the
- * money, which is why there is no separate progress bar.
+ * The dots are the money. One per point's worth of the guaranteed allowance,
+ * all lit at zero: losing points puts them out from the end, earning points
+ * stacks gold ones on past the guarantee. A kid can see what they hold and
+ * what they stand to lose without reading a number.
  */
 function pipsFor(points, config, pop) {
   const frag = document.createDocumentFragment();
-  const goal = goalPoints(config);
+  let index = 0;
 
-  const dot = (kind, index, fresh) => {
+  const dot = (kind, fresh) => {
     const pip = document.createElement('i');
     pip.className = kind;
     if ((index + 1) % 5 === 0) pip.classList.add('gap');
     if (fresh) pip.classList.add('fresh');
     frag.append(pip);
-    return pip;
+    index++;
   };
 
-  if (points < 0) {
-    for (let i = 0; i < Math.min(-points, MAX_PIPS); i++) dot('owe', i, false);
-    return frag;
-  }
+  // A tiny rate would ask for hundreds of dots; show as many as stay readable.
+  const slots = Math.min(baselineSlots(config), MAX_PIPS);
+  const lost = Math.min(Math.max(0, -points), slots);
+  const bonus = Math.max(0, points);
 
-  const filled = Math.min(points, goal);
-  const over = points - filled;
+  for (let i = 0; i < slots - lost; i++) dot('on', false);
+  for (let i = 0; i < lost; i++) dot('lost', pop && i === lost - 1);
+  for (let i = 0; i < Math.min(bonus, MAX_PIPS); i++) dot('over', pop && i === bonus - 1);
 
-  // A very small rate would ask for hundreds of slots; fall back to plain pips.
-  const slots = goal <= MAX_PIPS ? goal : Math.min(filled, MAX_PIPS);
-  for (let i = 0; i < slots; i++) dot(i < filled ? 'on' : 'off', i, pop && i === filled - 1);
-  for (let i = 0; i < Math.min(over, MAX_PIPS); i++) dot('over', slots + i, pop && i === over - 1);
-
-  if (over > MAX_PIPS) {
+  if (bonus > MAX_PIPS) {
     const more = document.createElement('b');
-    more.textContent = `+${over - MAX_PIPS}`;
+    more.textContent = `+${bonus - MAX_PIPS}`;
     frag.append(more);
   }
   return frag;
 }
 
 function renderWeeks(state) {
-  const unpaid = outstanding(state);
-  // A week where nobody earned anything is noise in the ledger, not history.
-  const paid = paidHistory(state).filter(p => Object.values(p.kids).some(k => k.cents > 0)).slice(0, 4);
   const box = $('history');
   box.innerHTML = '';
 
-  if (unpaid.length) {
-    box.append(weekList(state, 'Not paid yet', unpaid, true));
-  }
-  if (paid.length) {
-    box.append(weekList(state, 'Already paid', paid, false));
-  }
+  const open = outstanding(state);
+  // A week nobody was owed anything for is noise in the ledger, not history.
+  const done = settled(state).filter(p => Object.values(p.kids).some(k => k.cents > 0)).slice(0, 4);
+
+  if (open.length) box.append(weekList(state, 'Not paid yet', open, true));
+  if (done.length) box.append(weekList(state, 'Already paid', done, false));
 }
 
-function weekList(state, heading, payouts, owing) {
+function weekList(state, heading, payouts, open) {
   const section = document.createElement('section');
+
   const rows = payouts.map(p => {
-    const amounts = state.kids
-      .map(k => `<span class="who" style="color:${colorOf(state.kids.indexOf(k))}">${esc(k.name)}</span> ${formatMoney(p.kids[k.id]?.cents || 0)}`)
-      .join(' &nbsp; ');
-    const tail = owing
-      ? (unlocked ? `<button class="edit" data-paid="${esc(p.id)}">Mark paid</button>` : '')
-      : `<span class="tick">✓</span> <span class="when">${fmtDay(p.paidOn)}</span>`;
+    const amounts = state.kids.map((k, i) => {
+      const share = p.kids[k.id];
+      if (!share) return '';
+      const mark = share.cents === 0 ? '' : share.paid ? ' <span class="tick">✓</span>' : '';
+      return `<span class="who" style="color:${colorOf(i)}">${esc(k.name)}</span> ${formatMoney(share.cents)}${mark}`;
+    }).filter(Boolean).join(' &nbsp; ');
+
+    // Friday is usually one action, so keep a way to settle all three at once.
+    const tail = open && unlocked
+      ? `<button class="edit" data-payweek="${esc(p.id)}">Pay everyone</button>`
+      : '';
+
     return `<li><span class="when">${fmtRange(p.weekStart, p.weekEnd)}</span> ${amounts} ${tail}</li>`;
   }).join('');
 
@@ -437,9 +450,9 @@ function patchKid(kidId, pop) {
   if (!kid || !card) return render();
 
   const score = card.querySelector('.score');
-  score.textContent = kid.points;
+  score.textContent = `${kid.points > 0 ? '+' : ''}${kid.points}`;
   score.classList.toggle('under', kid.points < 0);
-  card.querySelector('.worth').textContent = worthLine(kid.points, state);
+  card.querySelector('.worth').textContent = worthLine(kid.points, state.config);
   card.querySelector('.trophies').innerHTML = trophies(kid);
   card.querySelector('.kid-head .tier')?.remove();
   card.querySelector('.kid-head').insertAdjacentHTML('beforeend', tierBadge(kid.points));
@@ -474,7 +487,7 @@ function checkMilestones(state, onlyKidId) {
 
     // Highest first, one burst at a time.
     const won =
-      now.goal > (seen.goal || 0) ? { emoji: '✨', text: 'Goal reached' } :
+      now.bonus > (seen.bonus || 0) ? { emoji: '✨', text: 'In bonus' } :
       now.tier > (seen.tier || 0) && tier ? { emoji: tier.emoji, text: tier.name, color: tier.color } :
       now.best > (seen.best || 0) ? { emoji: '👑', text: 'Best week yet' } :
       now.streak > (seen.streak || 0) && now.streak >= 2 ? { emoji: '🔥', text: `${now.streak} weeks running` } :
@@ -538,11 +551,15 @@ function op(operation) {
 /* ---------------- wiring ---------------- */
 
 document.addEventListener('click', event => {
-  const target = event.target.closest('[data-bump],[data-paid],[data-edit],[data-behavior],[data-add]');
+  const target = event.target.closest('[data-bump],[data-paid],[data-payweek],[data-zero],[data-edit],[data-behavior],[data-add]');
   if (!target || !unlocked) return;
 
   if (target.dataset.bump) return bump(target.dataset.kid, Number(target.dataset.bump));
-  if (target.dataset.paid) return op({ type: 'markPaid', payoutId: target.dataset.paid, on: today });
+  if (target.dataset.paid) {
+    return op({ type: 'markPaid', payoutId: target.dataset.paid, kidId: target.dataset.kid, on: today });
+  }
+  if (target.dataset.payweek) return op({ type: 'markWeekPaid', payoutId: target.dataset.payweek, on: today });
+  if (target.dataset.zero) return confirmZero(target.dataset.zero);
   if (target.dataset.add) return editBehavior(target.dataset.add, null);
   if (target.dataset.edit) return editBehavior(target.dataset.kind, target.dataset.edit);
   if (target.dataset.behavior) return pickKid(target.dataset.kind, target.dataset.behavior);
@@ -690,9 +707,11 @@ function editBehavior(kind, behaviorId) {
 
 function openSettings() {
   const state = view();
+  $('in-base').value = (baselineCents(state.config) / 100).toFixed(2);
   $('in-rate').value = state.config.centsPerPoint;
   $('in-tz').value = state.config.timezone;
-  $('rate-hint').textContent = `At this rate, ${Math.round(700 / state.config.centsPerPoint)} points in a week is about $7.00.`;
+  $('rate-hint').textContent =
+    `${baselineSlots(state.config)} points either way is the whole allowance.`;
   $('kid-editors').innerHTML = state.kids.map(k => `
     <div>
       <input type="text" class="emoji" value="${esc(k.emoji)}" data-emoji="${esc(k.id)}" aria-label="Emoji for ${esc(k.name)}" maxlength="4">
@@ -712,6 +731,7 @@ $('form-settings').addEventListener('submit', event => {
   pending.ops.push({
     type: 'setConfig',
     config: {
+      baselineCents: Math.max(0, Math.round((Number($('in-base').value) || 10) * 100)),
       centsPerPoint: Math.max(1, Number($('in-rate').value) || 25),
       timezone: $('in-tz').value.trim() || 'UTC',
     },
@@ -720,9 +740,16 @@ $('form-settings').addEventListener('submit', event => {
   queueSave(0);
 });
 
-$('btn-zero').addEventListener('click', () => confirmThen(
-  'Zero out this week?', 'All three go back to 0 points. Payout records are not touched.', null,
-  () => { $('dlg-settings').close('cancel'); op({ type: 'zeroWeek' }); }));
+/** Resetting one kid lives on their own card, not in Settings. */
+function confirmZero(kidId) {
+  const kid = view().kids.find(k => k.id === kidId);
+  if (!kid) return;
+  confirmThen(
+    `Reset ${kid.name}'s week?`,
+    `${kid.name} goes back to 0 points, which is the plain allowance again. Their best week, their streak and anything they are owed are left alone.`,
+    null,
+    () => op({ type: 'zeroKid', kidId }));
+}
 
 $('btn-payall').addEventListener('click', () => confirmThen(
   'Mark everything paid?', 'Every week that is still owed gets marked paid today.', null,

@@ -32,7 +32,7 @@
   </section>
 
   <section id="view-list" role="tabpanel" aria-labelledby="tab-list" hidden>
-    <p class="lede" id="list-lede">Every point is worth <b id="rate">25¢</b>. Points start over every Friday, and whatever you finished the week with is what you get paid.</p>
+    <p class="lede" id="list-lede">Everyone starts every week with <b id="base">$10</b>. Each point is worth <b id="rate">25¢</b> on top of that, and each point lost takes the same off. Points start over every Friday, and whatever you finished the week at is what you get paid.</p>
     <div class="lists">
       <section class="list list-up">
         <h2>Ways to earn points</h2>
@@ -107,6 +107,11 @@
     <h2>Settings</h2>
 
     <label>
+      <span>Allowance every week, before points</span>
+      <input type="number" id="in-base" min="0" max="1000" step="0.5" required>
+    </label>
+
+    <label>
       <span>Cents per point</span>
       <input type="number" id="in-rate" min="1" max="1000" step="1" required>
     </label>
@@ -123,11 +128,10 @@
 
     <h3>Reset</h3>
     <div class="resets">
-      <button type="button" class="ghost" id="btn-zero">Zero out this week</button>
       <button type="button" class="ghost" id="btn-payall">Mark everything paid</button>
       <button type="button" class="danger" id="btn-startover">Start over</button>
     </div>
-    <p class="dlg-note">Start over wipes every payout record and sets all three back to zero. Your earn and lose lists stay.</p>
+    <p class="dlg-note">To put one kid back to zero, use the button on their card. Start over wipes every payout record and sets all three back to zero; your earn and lose lists stay.</p>
 
     <h3>This device</h3>
     <button type="button" class="ghost" id="btn-forget">Forget the token and password</button>
