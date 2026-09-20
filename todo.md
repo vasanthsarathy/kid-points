@@ -24,7 +24,8 @@ Design spec: `docs/superpowers/specs/2026-09-20-kid-points-design.md`
 - [x] `styles.css` — tier badges, slot states, cheer card, burst keyframes
 - [x] `data.json` — `weeklyGoalCents`, plus `best` and `streak` per kid
 - [x] `README.md` — a section explaining the game
-- [x] Tests green — 40 unit, 34 headless assertions
+- [x] Tests green — 40 unit, 46 headless assertions
+- [x] Second headless run covering the Settings resets — 22 assertions
 
 ### Round two review
 
@@ -49,6 +50,11 @@ Two bugs the headless run caught: an unqualified `matchMedia` call that threw
 and killed every burst, and — in the test harness, not the app — a GitHub stub
 that served the original state forever, which quietly rewound the app during a
 conflict retry and made the assertions lie.
+
+A second headless run drives the Settings dialog end to end: zero out the week,
+mark everything paid, save settings, start over behind its type-to-confirm, and
+forget the device. Those paths go through nested dialogs and were untested
+until asked about directly; they all pass.
 
 Still unverified: how any of it looks. No browser was available.
 
