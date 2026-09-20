@@ -7,6 +7,7 @@ import {
   centsFor, formatMoney,
   nextPayday, rollForward, prunePayouts,
   applyPending, pendingCount, outstanding,
+  TIERS, tierFor, tierLevel, nextTier, goalPoints, milestones,
 } from './logic.js';
 
 // 2026-09-18 is a Friday; 2026-09-20 is the Sunday after it.
@@ -263,4 +264,82 @@ test('a week where the only points were negative settles itself', () => {
   const { state } = rollForward(rough, '2026-09-25');
   assert.equal(state.payouts[0].paid, true);
   assert.deepEqual(state.payouts[0].kids.e, { points: -2, cents: 0 });
+});
+
+/* ---------------- the game ---------------- */
+
+test('goalPoints is how many points make the weekly goal', () => {
+  assert.equal(goalPoints({ centsPerPoint: 25 }), 28);            // $7.00 default
+  assert.equal(goalPoints({ centsPerPoint: 50 }), 14);
+  assert.equal(goalPoints({ centsPerPoint: 30 }), 24);            // rounds up past $7
+  assert.equal(goalPoints({ centsPerPoint: 25, weeklyGoalCents: 1000 }), 40);
+  assert.equal(goalPoints({ centsPerPoint: 2000 }), 1, 'never zero');
+});
+
+test('tiers start at ten and climb by ten', () => {
+  assert.equal(tierLevel(0), 0);
+  assert.equal(tierLevel(9), 0);
+  assert.equal(tierLevel(10), 1);
+  assert.equal(tierLevel(29), 2);
+  assert.equal(tierLevel(50), 5);
+  assert.equal(tierLevel(500), 5, 'tops out at the last tier');
+  assert.equal(tierLevel(-4), 0, 'no tier while under water');
+});
+
+test('tierFor and nextTier name the rung above and below', () => {
+  assert.equal(tierFor(0), null);
+  assert.equal(tierFor(34).name, 'Rocket');
+  assert.equal(nextTier(34).name, 'Champion');
+  assert.equal(nextTier(0).at, 10);
+  assert.equal(nextTier(50), null, 'nothing left to climb');
+});
+
+test('closing a week records a personal best', () => {
+  const state = seed();
+  const { state: after } = rollForward(state, '2026-09-25');
+  assert.equal(after.kids[1].best, 20);
+});
+
+test('a personal best only ever goes up', () => {
+  const state = seed();
+  state.kids[1].best = 40;
+  const { state: after } = rollForward(state, '2026-09-25');
+  assert.equal(after.kids[1].best, 40, 'a weaker week does not erase the record');
+});
+
+test('hitting the goal extends the streak, missing it ends the streak', () => {
+  const state = seed();                       // E 12, L 20, M -3; goal is 28
+  state.kids[0].points = 30;                  // E clears the goal
+  state.kids.forEach(k => { k.streak = 3; });
+  const { state: after } = rollForward(state, '2026-09-25');
+  assert.equal(after.kids[0].streak, 4);
+  assert.equal(after.kids[1].streak, 0);
+  assert.equal(after.kids[2].streak, 0);
+});
+
+test('a streak survives several closed weeks in one go', () => {
+  const state = seed();
+  state.kids[0].points = 28;
+  const { state: after } = rollForward(state, '2026-10-02');  // two weeks close
+  assert.equal(after.kids[0].streak, 0, 'the empty second week breaks it');
+  assert.equal(after.kids[0].best, 28);
+});
+
+test('milestones describe what a kid has earned right now', () => {
+  const state = seed();
+  state.kids[0].points = 30;
+  state.kids[0].best = 12;
+  state.kids[0].streak = 3;
+  assert.deepEqual(milestones(state, state.kids[0]), { tier: 3, goal: 1, best: 1, streak: 3 });
+});
+
+test('milestones report nothing for a kid at zero', () => {
+  const state = seed();
+  state.kids[0].points = 0;
+  assert.deepEqual(milestones(state, state.kids[0]), { tier: 0, goal: 0, best: 0, streak: 0 });
+});
+
+test('a kid under water has beaten no records', () => {
+  const state = seed();
+  assert.equal(milestones(state, state.kids[2]).best, 0, 'M is at -3');
 });

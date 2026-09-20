@@ -2,6 +2,7 @@ import {
   addDays, daysBetween, weekdayOf, todayIn, fmtDay, fmtRange,
   centsFor, formatMoney, nextPayday, rollForward,
   applyPending, emptyPending, pendingCount, outstanding, paidHistory,
+  TIERS, tierFor, nextTier, goalPoints, milestones,
 } from './logic.js';
 
 /* ------------------------------------------------------------------ *
@@ -235,6 +236,7 @@ function render() {
   renderLists(state);
   $('rate').textContent = `${state.config.centsPerPoint}¢`;
   $('parent-btn').textContent = unlocked ? 'Settings' : 'Parent';
+  checkMilestones(state);
 }
 
 function renderPayday(state) {
@@ -288,33 +290,80 @@ function renderKids(state) {
     card.className = 'kid';
     card.style.setProperty('--kid', colorOf(index));
     card.innerHTML = `
-      <div class="kid-head"><span class="avatar">${esc(kid.emoji)}</span><h2>${esc(kid.name)}</h2></div>
+      <div class="kid-head">
+        <span class="avatar">${esc(kid.emoji)}</span><h2>${esc(kid.name)}</h2>
+        ${tierBadge(kid.points)}
+      </div>
       <p class="score${kid.points < 0 ? ' under' : ''}">${kid.points}</p>
-      <p class="worth">${formatMoney(centsFor(kid.points, state.config.centsPerPoint))} so far this week</p>
+      <p class="worth">${worthLine(kid.points, state)}</p>
       <div class="pips"></div>
+      <p class="trophies">${trophies(kid)}</p>
       ${unlocked ? `<div class="controls">
         <button class="minus" data-bump="-1" data-kid="${esc(kid.id)}" aria-label="Take a point from ${esc(kid.name)}">−</button>
         <button class="plus" data-bump="1" data-kid="${esc(kid.id)}" aria-label="Give ${esc(kid.name)} a point">+</button>
       </div>` : ''}
       <p class="status ${status.cls}">${status.html}</p>`;
-    card.querySelector('.pips').append(pipsFor(kid.points, false));
+    card.querySelector('.pips').append(pipsFor(kid.points, state.config, false));
     box.append(card);
   });
 }
 
-function pipsFor(points, pop) {
+function tierBadge(points) {
+  const tier = tierFor(points);
+  if (tier) return `<span class="tier" style="--tier:${tier.color}">${tier.emoji} ${tier.name}</span>`;
+  const next = nextTier(points);
+  return next ? `<span class="tier next">${next.at - points} to ${next.name}</span>` : '';
+}
+
+function worthLine(points, state) {
+  const money = formatMoney(centsFor(points, state.config.centsPerPoint));
+  const short = goalPoints(state.config) - points;
+  if (short > 0) return `${money} so far — ${short} more for the goal`;
+  return `${money} so far — goal reached`;
+}
+
+function trophies(kid) {
+  const won = [];
+  if (kid.points > 0 && kid.points > (kid.best || 0)) won.push('<span class="trophy">👑 Best week yet</span>');
+  if ((kid.streak || 0) >= 2) won.push(`<span class="trophy">🔥 ${kid.streak} weeks running</span>`);
+  return won.join('');
+}
+
+/**
+ * The slots double as the progress bar: one per point needed for the weekly
+ * goal, filling in as they are earned, with anything past the goal stacked on
+ * in gold. One row of dots carries the exact count and the distance to the
+ * money, which is why there is no separate progress bar.
+ */
+function pipsFor(points, config, pop) {
   const frag = document.createDocumentFragment();
-  const total = Math.min(Math.abs(points), MAX_PIPS);
-  for (let i = 0; i < total; i++) {
+  const goal = goalPoints(config);
+
+  const dot = (kind, index, fresh) => {
     const pip = document.createElement('i');
-    if (points < 0) pip.classList.add('owe');
-    if ((i + 1) % 5 === 0 && i + 1 < total) pip.classList.add('gap');
-    if (pop && i === total - 1) pip.classList.add('fresh');
+    pip.className = kind;
+    if ((index + 1) % 5 === 0) pip.classList.add('gap');
+    if (fresh) pip.classList.add('fresh');
     frag.append(pip);
+    return pip;
+  };
+
+  if (points < 0) {
+    for (let i = 0; i < Math.min(-points, MAX_PIPS); i++) dot('owe', i, false);
+    return frag;
   }
-  if (Math.abs(points) > MAX_PIPS) {
+
+  const filled = Math.min(points, goal);
+  const over = points - filled;
+
+  // A very small rate would ask for hundreds of slots; fall back to plain pips.
+  const slots = goal <= MAX_PIPS ? goal : Math.min(filled, MAX_PIPS);
+  for (let i = 0; i < slots; i++) dot(i < filled ? 'on' : 'off', i, pop && i === filled - 1);
+  for (let i = 0; i < Math.min(over, MAX_PIPS); i++) dot('over', slots + i, pop && i === over - 1);
+
+  if (over > MAX_PIPS) {
     const more = document.createElement('b');
-    more.textContent = `+${Math.abs(points) - MAX_PIPS}`;
+    more.textContent = `+${over - MAX_PIPS}`;
     frag.append(more);
   }
   return frag;
@@ -390,9 +439,94 @@ function patchKid(kidId, pop) {
   const score = card.querySelector('.score');
   score.textContent = kid.points;
   score.classList.toggle('under', kid.points < 0);
-  card.querySelector('.worth').textContent =
-    `${formatMoney(centsFor(kid.points, state.config.centsPerPoint))} so far this week`;
-  card.querySelector('.pips').replaceChildren(pipsFor(kid.points, pop));
+  card.querySelector('.worth').textContent = worthLine(kid.points, state);
+  card.querySelector('.trophies').innerHTML = trophies(kid);
+  card.querySelector('.kid-head .tier')?.remove();
+  card.querySelector('.kid-head').insertAdjacentHTML('beforeend', tierBadge(kid.points));
+  card.querySelector('.pips').replaceChildren(pipsFor(kid.points, state.config, pop));
+  checkMilestones(state, kidId);
+}
+
+/* ---------------- milestones ---------------- */
+
+/**
+ * Each device remembers what it has already shown for each kid, so the parent
+ * gets confetti when they tap and the kid gets their own the first time they
+ * open the page afterwards. When a score drops — a new week, or points taken
+ * away — the note rewinds quietly so nothing fires twice.
+ */
+function lastShown(kidId) {
+  try { return JSON.parse(localStorage.getItem(`kp.seen.${kidId}`)) || {}; } catch { return {}; }
+}
+
+function rememberShown(kidId, signature) {
+  try { localStorage.setItem(`kp.seen.${kidId}`, JSON.stringify(signature)); } catch { /* private window */ }
+}
+
+function checkMilestones(state, onlyKidId) {
+  let stagger = 0;
+  state.kids.forEach((kid, index) => {
+    if (onlyKidId && kid.id !== onlyKidId) return;
+
+    const now = milestones(state, kid);
+    const seen = lastShown(kid.id);
+    const tier = TIERS[now.tier - 1];
+
+    // Highest first, one burst at a time.
+    const won =
+      now.goal > (seen.goal || 0) ? { emoji: '✨', text: 'Goal reached' } :
+      now.tier > (seen.tier || 0) && tier ? { emoji: tier.emoji, text: tier.name, color: tier.color } :
+      now.best > (seen.best || 0) ? { emoji: '👑', text: 'Best week yet' } :
+      now.streak > (seen.streak || 0) && now.streak >= 2 ? { emoji: '🔥', text: `${now.streak} weeks running` } :
+      null;
+
+    rememberShown(kid.id, now);
+    if (!won) return;
+
+    setTimeout(() => celebrate(index, won), stagger);
+    stagger += 400;
+  });
+}
+
+function celebrate(index, won) {
+  const card = $('kids').children[index];
+  if (!card) return;
+
+  const cheer = document.createElement('div');
+  cheer.className = 'cheer';
+  if (won.color) cheer.style.setProperty('--tier', won.color);
+  cheer.innerHTML = `<span class="cheer-emoji">${won.emoji}</span><span>${esc(won.text)}</span>`;
+  card.append(cheer);
+
+  const score = card.querySelector('.score');
+  score?.classList.add('bounce');
+  setTimeout(() => score?.classList.remove('bounce'), 800);
+  setTimeout(() => cheer.remove(), 2200);
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) throwConfetti(card);
+}
+
+function throwConfetti(card) {
+  // Bits live on the body, not the card, so the card can keep clipping its
+  // own corners while the confetti sprays past them.
+  const box = card.getBoundingClientRect();
+  const originX = box.left + box.width / 2;
+  const originY = box.top + box.height * 0.35;
+  const colors = ['#f4718b', '#6e7bf2', '#2bb3a3', '#f0a500', '#a755d6'];
+
+  for (let i = 0; i < 24; i++) {
+    const bit = document.createElement('i');
+    bit.className = 'confetti';
+    bit.style.background = colors[i % colors.length];
+    bit.style.left = `${originX}px`;
+    bit.style.top = `${originY}px`;
+    bit.style.setProperty('--x', `${(Math.random() * 2 - 1) * 110}px`);
+    bit.style.setProperty('--y', `${-70 - Math.random() * 90}px`);
+    bit.style.setProperty('--spin', `${Math.random() * 720 - 360}deg`);
+    bit.style.setProperty('--fall', `${1 + Math.random() * 0.6}s`);
+    document.body.append(bit);
+    setTimeout(() => bit.remove(), 1900);
+  }
 }
 
 function op(operation) {

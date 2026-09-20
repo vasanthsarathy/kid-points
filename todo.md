@@ -16,6 +16,42 @@ Design spec: `docs/superpowers/specs/2026-09-20-kid-points-design.md`
 - [x] Run `node --test` and confirm green — 30 passing
 - [x] Review section below
 
+## Round two — gamification
+
+- [x] `logic.js` — tiers, goal points, best and streak maintained on rollover
+- [x] `logic.test.js` — 10 more tests for the above
+- [x] `app.js` — tier badge, goal slots, trophies, milestone detection, confetti
+- [x] `styles.css` — tier badges, slot states, cheer card, burst keyframes
+- [x] `data.json` — `weeklyGoalCents`, plus `best` and `streak` per kid
+- [x] `README.md` — a section explaining the game
+- [x] Tests green — 40 unit, 34 headless assertions
+
+### Round two review
+
+The pips became the game board rather than gaining a sibling: one slot per
+point needed for $7, filling as they are earned, overflow in gold. That
+replaced the progress bar the design first called for — one element now carries
+the exact count and the distance to the money.
+
+Four things to earn: weekly tiers at 10/20/30/40/50, the $7 goal, a personal
+best, and a streak of goal weeks. Tiers and the goal are derived from the
+score, so they need no storage. Best and streak are kept on the kid record and
+updated when a week closes — deliberately not derived from `payouts`, which is
+pruned to twelve weeks and would silently forget an old record.
+
+The celebration is driven by comparing the current milestones against a note in
+each browser's `localStorage`. That is what makes a kid see their own confetti
+when they open the page on Tuesday, rather than the parent being the only one
+who ever sees it. When a score drops the note rewinds, so re-crossing a rung
+celebrates again and nothing double-fires.
+
+Two bugs the headless run caught: an unqualified `matchMedia` call that threw
+and killed every burst, and — in the test harness, not the app — a GitHub stub
+that served the original state forever, which quietly rewound the app during a
+conflict retry and made the assertions lie.
+
+Still unverified: how any of it looks. No browser was available.
+
 ## Review
 
 ### What was built

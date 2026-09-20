@@ -2,33 +2,103 @@
   "version": 1,
   "config": {
     "centsPerPoint": 25,
+    "weeklyGoalCents": 700,
     "timezone": "America/Los_Angeles"
   },
   "cycle": {
     "startDate": "2026-09-18"
   },
   "kids": [
-    { "id": "e", "name": "E", "emoji": "🦊", "points": 0 },
-    { "id": "l", "name": "L", "emoji": "🐼", "points": 0 },
-    { "id": "m", "name": "M", "emoji": "🦖", "points": 0 }
+    {
+      "id": "e",
+      "name": "E",
+      "emoji": "🦊",
+      "points": 0,
+      "best": 0,
+      "streak": 0
+    },
+    {
+      "id": "l",
+      "name": "L",
+      "emoji": "🐼",
+      "points": 0,
+      "best": 0,
+      "streak": 0
+    },
+    {
+      "id": "m",
+      "name": "M",
+      "emoji": "🦖",
+      "points": 0,
+      "best": 0,
+      "streak": 0
+    }
   ],
   "payouts": [],
   "behaviors": {
     "positive": [
-      { "id": "p1", "label": "Made your bed without being asked", "points": 2 },
-      { "id": "p2", "label": "Homework done before dinner", "points": 3 },
-      { "id": "p3", "label": "Cleared the table", "points": 2 },
-      { "id": "p4", "label": "Read for 20 minutes", "points": 3 },
-      { "id": "p5", "label": "Helped a sibling", "points": 4 },
-      { "id": "p6", "label": "Got ready on time in the morning", "points": 2 },
-      { "id": "p7", "label": "Put your laundry away", "points": 2 }
+      {
+        "id": "p1",
+        "label": "Made your bed without being asked",
+        "points": 2
+      },
+      {
+        "id": "p2",
+        "label": "Homework done before dinner",
+        "points": 3
+      },
+      {
+        "id": "p3",
+        "label": "Cleared the table",
+        "points": 2
+      },
+      {
+        "id": "p4",
+        "label": "Read for 20 minutes",
+        "points": 3
+      },
+      {
+        "id": "p5",
+        "label": "Helped a sibling",
+        "points": 4
+      },
+      {
+        "id": "p6",
+        "label": "Got ready on time in the morning",
+        "points": 2
+      },
+      {
+        "id": "p7",
+        "label": "Put your laundry away",
+        "points": 2
+      }
     ],
     "negative": [
-      { "id": "n1", "label": "Hit or hurt a sibling", "points": -5 },
-      { "id": "n2", "label": "Talked back", "points": -3 },
-      { "id": "n3", "label": "Screen time without asking", "points": -3 },
-      { "id": "n4", "label": "Left a mess and walked away", "points": -2 },
-      { "id": "n5", "label": "Had to be asked three times", "points": -2 }
+      {
+        "id": "n1",
+        "label": "Hit or hurt a sibling",
+        "points": -5
+      },
+      {
+        "id": "n2",
+        "label": "Talked back",
+        "points": -3
+      },
+      {
+        "id": "n3",
+        "label": "Screen time without asking",
+        "points": -3
+      },
+      {
+        "id": "n4",
+        "label": "Left a mess and walked away",
+        "points": -2
+      },
+      {
+        "id": "n5",
+        "label": "Had to be asked three times",
+        "points": -2
+      }
     ]
   }
 }

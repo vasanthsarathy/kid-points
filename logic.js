@@ -47,6 +47,52 @@ export function centsFor(points, centsPerPoint) {
   return Math.max(0, points) * centsPerPoint;
 }
 
+/* ---------------- the game ---------------- */
+
+/** Rungs to climb inside a single week. They reset with the points on Friday. */
+export const TIERS = [
+  { at: 10, name: 'Sprout', emoji: '🌱', color: '#3fa55f' },
+  { at: 20, name: 'Spark', emoji: '⚡', color: '#d99414' },
+  { at: 30, name: 'Rocket', emoji: '🚀', color: '#6e7bf2' },
+  { at: 40, name: 'Champion', emoji: '🏆', color: '#d9683a' },
+  { at: 50, name: 'Legend', emoji: '👑', color: '#a755d6' },
+];
+
+/** How many points make the weekly goal at the current rate. */
+export function goalPoints(config) {
+  const goalCents = config.weeklyGoalCents ?? 700;
+  return Math.max(1, Math.ceil(goalCents / config.centsPerPoint));
+}
+
+/** 0 through TIERS.length — how many rungs are cleared. */
+export function tierLevel(points) {
+  return TIERS.filter(tier => points >= tier.at).length;
+}
+
+export function tierFor(points) {
+  return TIERS[tierLevel(points) - 1] || null;
+}
+
+export function nextTier(points) {
+  return TIERS.find(tier => points < tier.at) || null;
+}
+
+/**
+ * Everything a kid has earned as of right now, as plain numbers. Comparing
+ * this against what a device last showed is what decides whether to celebrate,
+ * so each kid gets their own confetti the first time they open the page —
+ * not only the parent who tapped the button.
+ */
+export function milestones(state, kid) {
+  const goal = goalPoints(state.config);
+  return {
+    tier: tierLevel(kid.points),
+    goal: kid.points >= goal ? 1 : 0,
+    best: kid.points > 0 && kid.points > (kid.best || 0) ? 1 : 0,
+    streak: kid.streak || 0,
+  };
+}
+
 export function formatMoney(cents) {
   return `$${(cents / 100).toFixed(2)}`;
 }
@@ -70,9 +116,13 @@ export function rollForward(state, today) {
   // Ten years of weeks — a corrupt future date can't spin this forever.
   for (let guard = 0; guard < 520 && today >= addDays(next.cycle.startDate, 7); guard++) {
     const weekStart = next.cycle.startDate;
+    const goal = goalPoints(next.config);
     const kids = {};
     for (const kid of next.kids) {
       kids[kid.id] = { points: kid.points, cents: centsFor(kid.points, next.config.centsPerPoint) };
+      // Records outlive the payout list, which gets pruned.
+      kid.best = Math.max(kid.best || 0, kid.points);
+      kid.streak = kid.points >= goal ? (kid.streak || 0) + 1 : 0;
       kid.points = 0;
     }
     // A week where nobody earned anything is not a debt, so it settles itself

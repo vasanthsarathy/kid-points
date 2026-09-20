@@ -61,6 +61,36 @@ bottom of the screen says `Saving…` and then `Saved`.
 **Behaviors as shortcuts.** On the **Earn & lose** tab, tap a row like
 *Made your bed +2*, pick a kid, and it applies the points in one go.
 
+## The game
+
+The dots under each score are the game board: one slot per point needed to
+reach $7, filling in as they are earned. Anything past the goal stacks on in
+gold. An empty card reads as a chart waiting to be filled.
+
+There are four things to earn:
+
+| | What it takes |
+|---|---|
+| 🌱 ⚡ 🚀 🏆 👑 | 10, 20, 30, 40 and 50 points in a week — Sprout, Spark, Rocket, Champion, Legend. Below 10 the badge counts down instead. |
+| ✨ | Every slot filled, which is the $7 goal |
+| 👑 | Beating their own best week |
+| 🔥 | Two or more weeks in a row hitting the goal |
+
+Crossing one sets off confetti on the card. Because the celebration is worked
+out from the score rather than from your tap, **each kid gets their own**
+confetti the first time they open the page after crossing — you are not the
+only one who sees it. Each browser keeps its own note of what it has already
+shown, so nothing fires twice and nothing is missed.
+
+Tiers and the goal reset every Friday with the points. Best and streak carry
+over. If a kid loses points and drops back under a rung, the badge quietly
+steps down and re-crossing it celebrates again.
+
+A streak ends silently — the flame just stops appearing — rather than
+announcing that a run was broken.
+
+---
+
 **Paying out.** Every Friday the week closes on its own and shows under
 **Not paid yet** with what each kid is owed. When you hand over the money, tap
 **Mark paid**. A week where nobody earned anything settles itself and never

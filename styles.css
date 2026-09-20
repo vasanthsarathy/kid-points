@@ -173,6 +173,7 @@ button { font: inherit; cursor: pointer; }
 }
 
 .kid {
+  position: relative;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
@@ -222,16 +223,113 @@ button { font: inherit; cursor: pointer; }
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: var(--kid);
   display: block;
+  box-sizing: border-box;
 }
 
 .pips i.gap { margin-right: 9px; }
+.pips i.on { background: var(--kid); }
+.pips i.off { background: transparent; border: 1.5px solid color-mix(in srgb, var(--kid) 28%, var(--line)); }
+.pips i.over { background: var(--owed); }
 .pips i.owe { background: transparent; border: 2px solid var(--danger); }
 .pips b { font-size: .75rem; color: var(--muted); font-weight: 600; align-self: center; }
 
 @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
 .pips i.fresh { animation: pop .18s ease-out; }
+
+/* ---------- the game ---------- */
+
+.tier {
+  margin-left: auto;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: .75rem;
+  white-space: nowrap;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--tier);
+  background: color-mix(in srgb, var(--tier) 16%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--tier) 45%, transparent);
+}
+
+.tier.next {
+  font-family: var(--text);
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border-color: var(--line);
+}
+
+.trophies { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 16px 0; }
+.trophies:empty { display: none; }
+
+.trophy {
+  font-size: .75rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--owed-bg);
+  color: var(--owed-ink);
+  border: 1px solid color-mix(in srgb, var(--owed) 35%, transparent);
+}
+
+.cheer {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 12px 20px;
+  border-radius: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: .9375rem;
+  color: #fff;
+  background: var(--tier, var(--kid));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+  animation: cheer-in .38s cubic-bezier(.2, 1.7, .4, 1) both,
+             cheer-out .4s ease-in 1.7s both;
+}
+
+.cheer-emoji { font-size: 1.875rem; line-height: 1.1; }
+
+@keyframes cheer-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.3); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes cheer-out {
+  to { opacity: 0; transform: translate(-50%, -68%) scale(.92); }
+}
+
+@keyframes bounce {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.28); }
+  60%  { transform: scale(.94); }
+  100% { transform: scale(1); }
+}
+
+.score.bounce { animation: bounce .7s cubic-bezier(.2, 1.4, .4, 1); transform-origin: left center; }
+
+.confetti {
+  position: fixed;
+  width: 8px;
+  height: 11px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 30;
+  animation: burst var(--fall) cubic-bezier(.15, .6, .5, 1) forwards;
+}
+
+@keyframes burst {
+  0%   { transform: translate(-50%, -50%) rotate(0deg); opacity: 1; }
+  35%  { transform: translate(calc(-50% + var(--x) * .75), calc(-50% + var(--y))) rotate(calc(var(--spin) * .4)); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y) + 230px)) rotate(var(--spin)); opacity: 0; }
+}
 
 .controls { display: flex; gap: 8px; margin: 14px 16px 0; }
 
