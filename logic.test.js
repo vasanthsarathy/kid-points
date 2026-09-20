@@ -7,7 +7,7 @@ import {
   centsFor, formatMoney, baselineSlots,
   nextPayday, migrate, rollForward, prunePayouts,
   outstanding, settled, owedTo, owedCents, lastPaidTo, weekIsOpen,
-  applyPending, pendingCount,
+  applyPending, emptyPending, queueBump, pendingCount,
   TIERS, tierFor, tierLevel, nextTier, milestones,
 } from './logic.js';
 
@@ -348,18 +348,33 @@ test('prunePayouts never drops a week someone is still owed, however old', () =>
 
 /* ---------------- unsaved changes ---------------- */
 
-test('applyPending replays point deltas onto whatever state it is handed', () => {
+const bumps = (...pairs) => {
+  const pending = emptyPending();
+  for (const [kidId, delta] of pairs) queueBump(pending, kidId, delta);
+  return pending;
+};
+
+test('applyPending replays point changes onto whatever state it is handed', () => {
   const fresh = seed();
   fresh.kids[0].points = 40; // another device already added points
-  const out = applyPending(fresh, { deltas: { e: 3, m: -2 } });
+  const out = applyPending(fresh, bumps(['e', 3], ['m', -2]));
   assert.equal(out.kids[0].points, 43);
   assert.equal(out.kids[2].points, -5);
   assert.equal(fresh.kids[0].points, 40, 'input is not mutated');
 });
 
-test('applyPending ignores deltas for a kid who no longer exists', () => {
-  const out = applyPending(seed(), { deltas: { nobody: 5 } });
+test('applyPending ignores changes for a kid who no longer exists', () => {
+  const out = applyPending(seed(), bumps(['nobody', 5]));
   assert.deepEqual(out.kids.map(k => k.points), [12, 20, -3]);
+});
+
+test('queueBump merges taps on the same kid but keeps a change of target apart', () => {
+  const pending = bumps(['e', 1], ['e', 1], ['l', 1], ['e', 1]);
+  assert.deepEqual(pending.ops, [
+    { type: 'bump', kidId: 'e', delta: 2 },
+    { type: 'bump', kidId: 'l', delta: 1 },
+    { type: 'bump', kidId: 'e', delta: 1 },
+  ]);
 });
 
 test('markPaid settles one kid without touching their siblings', () => {
@@ -399,9 +414,29 @@ test('zeroKid resets one kid and leaves the others alone', () => {
   assert.deepEqual(out.kids.map(k => k.points), [12, 0, -3]);
 });
 
-test('zeroKid runs after the deltas, so a pending tap does not survive it', () => {
-  const out = applyPending(seed(), { deltas: { l: 5 }, ops: [{ type: 'zeroKid', kidId: 'l' }] });
-  assert.equal(out.kids[1].points, 0);
+test('a reset wipes taps made before it', () => {
+  const pending = bumps(['l', 5]);
+  pending.ops.push({ type: 'zeroKid', kidId: 'l' });
+  assert.equal(applyPending(seed(), pending).kids[1].points, 0);
+});
+
+test('but taps made after a reset survive it', () => {
+  // Order used to be ignored: point changes always replayed first, so an
+  // unsaved reset swallowed every tap that followed it.
+  const pending = emptyPending();
+  pending.ops.push({ type: 'zeroKid', kidId: 'l' });
+  queueBump(pending, 'l', 5);
+  assert.equal(applyPending(seed(), pending).kids[1].points, 5);
+});
+
+test('a reset and a re-reset both land in the order they were made', () => {
+  const pending = emptyPending();
+  queueBump(pending, 'l', 4);
+  pending.ops.push({ type: 'zeroKid', kidId: 'l' });
+  queueBump(pending, 'l', 7);
+  pending.ops.push({ type: 'zeroKid', kidId: 'l' });
+  queueBump(pending, 'l', 2);
+  assert.equal(applyPending(seed(), pending).kids[1].points, 2);
 });
 
 test('startOver clears payouts and points but keeps behaviors', () => {
@@ -437,7 +472,9 @@ test('setKids preserves the points already on the board', () => {
 });
 
 test('pendingCount reports whether anything is unsaved', () => {
-  assert.equal(pendingCount({ deltas: {}, ops: [] }), 0);
-  assert.equal(pendingCount({ deltas: { e: 0 }, ops: [] }), 0, 'a delta of zero is not a change');
-  assert.equal(pendingCount({ deltas: { e: 3, l: -1 }, ops: [{ type: 'zeroKid', kidId: 'e' }] }), 3);
+  assert.equal(pendingCount(emptyPending()), 0);
+  assert.equal(pendingCount(bumps(['e', 1], ['e', -1])), 0, 'taps that cancel out are not a change');
+  const mixed = bumps(['e', 3], ['l', -1]);
+  mixed.ops.push({ type: 'zeroKid', kidId: 'e' });
+  assert.equal(pendingCount(mixed), 3);
 });

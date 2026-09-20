@@ -220,29 +220,34 @@ export function lastPaidTo(state, kidId) {
 /* ---------------- unsaved changes ---------------- */
 
 export function emptyPending() {
-  return { deltas: {}, ops: [] };
-}
-
-export function pendingCount(pending) {
-  const deltas = Object.values(pending.deltas || {}).filter(n => n !== 0).length;
-  return deltas + (pending.ops || []).length;
+  return { ops: [] };
 }
 
 /**
- * Replay unsaved changes onto a state. Changes are kept as deltas and discrete
- * ops rather than a snapshot of the whole file, so when a save collides with an
- * edit made on another device we can re-apply onto the fresh copy instead of
- * overwriting what the other device did.
+ * Queue a point change. Point taps are ordered alongside everything else
+ * rather than held separately: replaying them out of order let a pending
+ * reset swallow every tap made after it.
+ */
+export function queueBump(pending, kidId, delta) {
+  const last = pending.ops[pending.ops.length - 1];
+  if (last && last.type === 'bump' && last.kidId === kidId) last.delta += delta;
+  else pending.ops.push({ type: 'bump', kidId, delta });
+  return pending;
+}
+
+export function pendingCount(pending) {
+  return (pending.ops || []).filter(op => op.type !== 'bump' || op.delta !== 0).length;
+}
+
+/**
+ * Replay unsaved changes onto a state, in the order they were made. Changes
+ * are kept as a list of small actions rather than a snapshot of the whole
+ * file, so when a save collides with an edit from another device we can
+ * re-apply onto the fresh copy instead of overwriting what they did.
  */
 export function applyPending(state, pending) {
   const next = structuredClone(state);
-
-  for (const [kidId, delta] of Object.entries(pending.deltas || {})) {
-    const kid = next.kids.find(k => k.id === kidId);
-    if (kid) kid.points += delta;
-  }
   for (const op of pending.ops || []) applyOp(next, op);
-
   return next;
 }
 
@@ -252,6 +257,11 @@ function pay(share, on) {
 
 function applyOp(state, op) {
   switch (op.type) {
+    case 'bump': {
+      const kid = state.kids.find(k => k.id === op.kidId);
+      if (kid) kid.points += op.delta;
+      break;
+    }
     case 'markPaid': {
       const payout = state.payouts.find(p => p.id === op.payoutId);
       pay(payout?.kids[op.kidId], op.on);

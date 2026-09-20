@@ -56,6 +56,15 @@ mark everything paid, save settings, start over behind its type-to-confirm, and
 forget the device. Those paths go through nested dialogs and were untested
 until asked about directly; they all pass.
 
+**Bug found in review:** after resetting a kid, + and − did nothing. Unsaved
+changes were stored as a map of point deltas plus a list of other actions, and
+`applyPending` always replayed the deltas first — so a reset that had not been
+written yet swallowed every tap made after it. On the live site that window is
+about a second; in the local preview, where saving is off, it never closed and
+the kid was stuck at zero. Unsaved changes are now one ordered list, with a
+point tap as just another entry, so they replay in the order they happened.
+An earlier test had asserted the broken behaviour as if it were intended.
+
 Still unverified: how any of it looks. No browser was available.
 
 ## Review

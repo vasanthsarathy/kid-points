@@ -3,7 +3,7 @@ import {
   centsFor, formatMoney, baselineCents, baselineSlots,
   nextPayday, migrate, rollForward,
   outstanding, settled, owedTo, lastPaidTo,
-  applyPending, emptyPending, pendingCount,
+  applyPending, emptyPending, queueBump, pendingCount,
   TIERS, tierFor, nextTier, milestones,
 } from './logic.js';
 
@@ -152,13 +152,20 @@ const OP_LABEL = {
 };
 
 function commitMessage(changes) {
+  // Point taps read better summed per kid than listed one by one, even though
+  // they are stored in order.
+  const totals = new Map();
   const parts = [];
-  for (const [kidId, delta] of Object.entries(changes.deltas)) {
+
+  for (const op of changes.ops) {
+    if (op.type !== 'bump') { parts.push(OP_LABEL[op.type] || op.type); continue; }
+    totals.set(op.kidId, (totals.get(op.kidId) || 0) + op.delta);
+  }
+  for (const [kidId, delta] of totals) {
     if (!delta) continue;
     const kid = base.state.kids.find(k => k.id === kidId);
-    parts.push(`${kid ? kid.name : kidId} ${delta > 0 ? '+' : ''}${delta}`);
+    parts.unshift(`${kid ? kid.name : kidId} ${delta > 0 ? '+' : ''}${delta}`);
   }
-  for (const op of changes.ops) parts.push(OP_LABEL[op.type] || op.type);
   return parts.length ? parts.join(', ') : 'Close out the week';
 }
 
@@ -200,9 +207,8 @@ async function save() {
 }
 
 function restore(changes, message) {
-  for (const [kidId, delta] of Object.entries(changes.deltas)) {
-    pending.deltas[kidId] = (pending.deltas[kidId] || 0) + delta;
-  }
+  // The rejected changes happened before anything queued since, so they go back
+  // in front to keep the replay order honest.
   pending.ops = [...changes.ops, ...pending.ops];
   pill(message || 'Could not save', 0, true);
 }
@@ -432,7 +438,7 @@ function renderLists(state) {
 /* ---------------- parent actions ---------------- */
 
 function bump(kidId, delta) {
-  pending.deltas[kidId] = (pending.deltas[kidId] || 0) + delta;
+  queueBump(pending, kidId, delta);
   patchKid(kidId, delta > 0);
   queueSave();
 }
