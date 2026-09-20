@@ -566,9 +566,18 @@ window.addEventListener('beforeunload', event => {
 
 /* ---------------- dialogs ---------------- */
 
+// Secondary dialog actions are plain buttons, not submit buttons: the first
+// submit button in a form is what Enter triggers, and Cancel sits before the
+// primary action. As submit buttons they silently swallowed the Enter key.
+document.addEventListener('click', event => {
+  const closer = event.target.closest('[data-close]');
+  if (closer) closer.closest('dialog').close(closer.dataset.close);
+});
+
 function openUnlock() {
   const first = !readToken();
   $('wrap-token').hidden = !first;
+  $('unlock-forget').hidden = first;
   $('in-token').value = '';
   $('in-pw').value = '';
   $('unlock-error').hidden = true;
@@ -608,6 +617,15 @@ $('form-unlock').addEventListener('submit', async event => {
   }
   unlocked = true;
   render();
+});
+
+// Without this the only way out of a forgotten password is clearing site data,
+// because "Forget this device" lives in Settings, which needs you unlocked.
+$('unlock-forget').addEventListener('click', () => {
+  forgetDevice();
+  $('dlg-unlock').close('cancel');
+  render();
+  openUnlock();
 });
 
 function showUnlockError(message) {

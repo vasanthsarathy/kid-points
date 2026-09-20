@@ -543,3 +543,16 @@ dialog menu .danger { margin-right: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+.linkish {
+  justify-self: start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: .8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.linkish:hover { color: var(--ink); }
