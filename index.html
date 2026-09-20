@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kid Points</title>
+<meta name="description" content="Points and allowance for E, L and M.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>⭐</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1 class="wordmark">Kid Points</h1>
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-scores" aria-controls="view-scores" aria-selected="true">Scores</button>
+    <button role="tab" id="tab-list" aria-controls="view-list" aria-selected="false">Earn &amp; lose</button>
+  </div>
+  <button id="parent-btn" class="ghost">Parent</button>
+</header>
+
+<p id="banner" class="banner" role="status" hidden></p>
+
+<main>
+  <section id="view-scores" role="tabpanel" aria-labelledby="tab-scores">
+    <div class="payday" id="payday"></div>
+    <div class="kids" id="kids"></div>
+    <section class="history" id="history"></section>
+  </section>
+
+  <section id="view-list" role="tabpanel" aria-labelledby="tab-list" hidden>
+    <p class="lede" id="list-lede">Every point is worth <b id="rate">25¢</b>. Points start over every Friday, and whatever you finished the week with is what you get paid.</p>
+    <div class="lists">
+      <section class="list list-up">
+        <h2>Ways to earn points</h2>
+        <ul id="list-positive"></ul>
+        <button class="add-row" data-add="positive" hidden>Add a way to earn points</button>
+      </section>
+      <section class="list list-down">
+        <h2>Ways to lose points</h2>
+        <ul id="list-negative"></ul>
+        <button class="add-row" data-add="negative" hidden>Add a way to lose points</button>
+      </section>
+    </div>
+  </section>
+</main>
+
+<div id="savepill" class="savepill" role="status" aria-live="polite" hidden></div>
+
+<!-- Parent unlock -->
+<dialog id="dlg-unlock">
+  <form method="dialog" id="form-unlock">
+    <h2 id="unlock-title">Parent</h2>
+    <p class="dlg-note" id="unlock-note"></p>
+    <label id="wrap-token" hidden>
+      <span>GitHub token</span>
+      <input type="password" id="in-token" autocomplete="off" placeholder="github_pat_…">
+    </label>
+    <label>
+      <span id="label-pw">Password</span>
+      <input type="password" id="in-pw" autocomplete="current-password">
+    </label>
+    <p class="dlg-error" id="unlock-error" hidden></p>
+    <menu>
+      <button value="cancel" class="ghost" type="submit" formnovalidate>Cancel</button>
+      <button value="ok" class="primary" id="unlock-ok">Unlock</button>
+    </menu>
+  </form>
+</dialog>
+
+<!-- Which kid does this behavior belong to -->
+<dialog id="dlg-pick">
+  <form method="dialog">
+    <h2 id="pick-title">Who?</h2>
+    <div class="pick-row" id="pick-row"></div>
+    <menu><button value="cancel" class="ghost">Cancel</button></menu>
+  </form>
+</dialog>
+
+<!-- Edit or add a behavior -->
+<dialog id="dlg-behavior">
+  <form method="dialog" id="form-behavior">
+    <h2 id="behavior-title">Add</h2>
+    <label>
+      <span>What happened</span>
+      <input type="text" id="in-blabel" required maxlength="80">
+    </label>
+    <label>
+      <span id="label-bpoints">Points</span>
+      <input type="number" id="in-bpoints" required min="1" max="100" step="1">
+    </label>
+    <menu>
+      <button value="delete" class="danger" id="behavior-delete" type="submit" formnovalidate>Delete</button>
+      <button value="cancel" class="ghost" type="submit" formnovalidate>Cancel</button>
+      <button value="ok" class="primary">Save</button>
+    </menu>
+  </form>
+</dialog>
+
+<!-- Settings -->
+<dialog id="dlg-settings">
+  <form method="dialog" id="form-settings">
+    <h2>Settings</h2>
+
+    <label>
+      <span>Cents per point</span>
+      <input type="number" id="in-rate" min="1" max="1000" step="1" required>
+    </label>
+    <p class="dlg-note" id="rate-hint"></p>
+
+    <label>
+      <span>Time zone</span>
+      <input type="text" id="in-tz" required>
+    </label>
+    <p class="dlg-note">Every device uses this zone to decide what day it is, so they all agree.</p>
+
+    <h3>Kids</h3>
+    <div id="kid-editors" class="kid-editors"></div>
+
+    <h3>Reset</h3>
+    <div class="resets">
+      <button type="button" class="ghost" id="btn-zero">Zero out this week</button>
+      <button type="button" class="ghost" id="btn-payall">Mark everything paid</button>
+      <button type="button" class="danger" id="btn-startover">Start over</button>
+    </div>
+    <p class="dlg-note">Start over wipes every payout record and sets all three back to zero. Your earn and lose lists stay.</p>
+
+    <h3>This device</h3>
+    <button type="button" class="ghost" id="btn-forget">Forget the token and password</button>
+
+    <menu>
+      <button value="cancel" class="ghost" type="submit" formnovalidate>Close</button>
+      <button value="ok" class="primary">Save settings</button>
+    </menu>
+  </form>
+</dialog>
+
+<!-- Type-to-confirm -->
+<dialog id="dlg-confirm">
+  <form method="dialog" id="form-confirm">
+    <h2 id="confirm-title"></h2>
+    <p class="dlg-note" id="confirm-body"></p>
+    <label id="confirm-wrap">
+      <span>Type <b id="confirm-word"></b> to continue</span>
+      <input type="text" id="in-confirm" autocomplete="off">
+    </label>
+    <menu>
+      <button value="cancel" class="ghost" type="submit" formnovalidate>Cancel</button>
+      <button value="ok" class="danger" id="confirm-ok">Do it</button>
+    </menu>
+  </form>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

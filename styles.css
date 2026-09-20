@@ -1,0 +1,447 @@
+/* Kid Points — a fridge chart that happens to live on the internet. */
+
+:root {
+  --paper: #f7f5fc;
+  --dot: #e6e0f4;
+  --card: #ffffff;
+  --ink: #2a2440;
+  --muted: #6e6880;
+  --line: #e4def2;
+  --owed: #f0a500;
+  --owed-bg: #fff4d6;
+  --owed-ink: #6b4a00;
+  --paid: #2bb3a3;
+  --danger: #d6455e;
+  --shadow: 0 2px 0 var(--line);
+  --radius-card: 22px;
+  --radius-pill: 999px;
+  --display: 'Fredoka', ui-rounded, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif;
+  --text: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15131c;
+    --dot: #221e30;
+    --card: #1e1b29;
+    --ink: #efebf7;
+    --muted: #a49cba;
+    --line: #2e2940;
+    --owed: #ffc44d;
+    --owed-bg: #3a2e12;
+    --owed-ink: #ffe6ae;
+    --paid: #46cfbe;
+    --danger: #ff7b8f;
+    --shadow: 0 2px 0 rgba(0, 0, 0, .35);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 16px 64px;
+  font-family: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  background-color: var(--paper);
+  /* Faint graph paper, the way a real chore chart is printed. */
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 22px 22px;
+  -webkit-text-size-adjust: 100%;
+}
+
+main { max-width: 980px; margin: 0 auto; }
+
+h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; }
+
+button { font: inherit; cursor: pointer; }
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 18px 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+  margin-right: auto;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+
+.tabs button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: .875rem;
+}
+
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+
+.ghost, .primary, .danger {
+  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: .875rem;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+
+.banner {
+  max-width: 980px;
+  margin: 0 auto 16px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--owed-bg);
+  color: var(--owed-ink);
+  border: 1px solid color-mix(in srgb, var(--owed) 45%, transparent);
+  font-size: .875rem;
+}
+
+/* ---------- payday strip ---------- */
+
+.payday {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.week { display: flex; gap: 5px; }
+
+.week span {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+}
+
+.week .done { color: var(--ink); }
+.week .today { background: var(--ink); color: var(--paper); }
+.week .pay { background: var(--owed-bg); color: var(--owed-ink); border: 1px solid var(--owed); }
+
+.payday-text { font-family: var(--display); font-size: 1.0625rem; font-weight: 500; }
+.payday-text b { font-weight: 600; }
+.payday-sub { color: var(--muted); font-size: .8125rem; font-family: var(--text); }
+
+/* ---------- kid cards ---------- */
+
+.kids {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+.kid {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.kid-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--kid) 16%, var(--card));
+  border-bottom: 2px solid var(--kid);
+}
+
+.kid-head .avatar { font-size: 1.5rem; line-height: 1; }
+.kid-head h2 { font-size: 1.25rem; font-weight: 600; }
+
+.score {
+  margin: 14px 16px 0;
+  font-family: var(--display);
+  font-size: clamp(3.25rem, 13vw, 4.5rem);
+  font-weight: 600;
+  line-height: .95;
+  letter-spacing: -0.03em;
+  color: var(--kid);
+  font-variant-numeric: tabular-nums;
+}
+
+.score.under { color: var(--danger); }
+
+.worth { margin: 2px 16px 0; color: var(--muted); font-size: .875rem; }
+
+/* Points drawn as tally pips, grouped in fives, so counting beats reading. */
+.pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 12px 16px 0;
+  min-height: 12px;
+}
+
+.pips i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--kid);
+  display: block;
+}
+
+.pips i.gap { margin-right: 9px; }
+.pips i.owe { background: transparent; border: 2px solid var(--danger); }
+.pips b { font-size: .75rem; color: var(--muted); font-weight: 600; align-self: center; }
+
+@keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+.pips i.fresh { animation: pop .18s ease-out; }
+
+.controls { display: flex; gap: 8px; margin: 14px 16px 0; }
+
+.controls button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 12px 0;
+  font-family: var(--display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1;
+  min-height: 48px;
+}
+
+.controls button:hover { background: color-mix(in srgb, var(--kid) 14%, var(--paper)); }
+.controls button:active { transform: translateY(1px); }
+.controls .plus { color: var(--kid); }
+.controls .minus { color: var(--muted); }
+
+.status { margin: 14px 0 0; padding: 10px 16px; font-size: .8125rem; border-top: 1px solid var(--line); }
+.status.is-owed { background: var(--owed-bg); color: var(--owed-ink); font-weight: 600; }
+.status.is-clear { color: var(--muted); }
+.status .money { font-family: var(--display); font-weight: 600; }
+.status button {
+  margin-top: 8px;
+  display: block;
+  width: 100%;
+  border: 1px solid var(--owed);
+  background: transparent;
+  color: var(--owed-ink);
+  border-radius: 10px;
+  padding: 7px 0;
+  font-size: .8125rem;
+  font-weight: 600;
+}
+
+/* ---------- paid history ---------- */
+
+.history { margin-top: 28px; }
+.history h2 { font-size: 1rem; color: var(--muted); font-weight: 500; margin-bottom: 8px; }
+.history ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+
+.history li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: .8125rem;
+}
+
+.history .when { color: var(--muted); min-width: 8ch; }
+.history .who { font-weight: 600; }
+.history .tick { color: var(--paid); font-weight: 700; }
+
+/* ---------- earn & lose ---------- */
+
+.lede { max-width: 62ch; color: var(--muted); margin: 0 0 22px; }
+.lede b { color: var(--ink); }
+
+.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+
+.list h2 { font-size: 1.125rem; margin-bottom: 10px; }
+.list-up h2 { color: var(--paid); }
+.list-down h2 { color: var(--danger); }
+.list ul { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; }
+
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.list li .label { flex: 1; }
+
+.list li .value {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.list-up .value { color: var(--paid); }
+.list-down .value { color: var(--danger); }
+
+.list li.tappable { cursor: pointer; }
+.list li.tappable:hover { border-color: var(--ink); }
+
+.list li .edit {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: .8125rem;
+}
+
+.list .empty { color: var(--muted); font-style: italic; box-shadow: none; }
+
+.add-row {
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 14px;
+  padding: 11px 14px;
+  width: 100%;
+  text-align: left;
+  font-size: .875rem;
+}
+
+.add-row:hover { color: var(--ink); border-color: var(--ink); }
+
+/* ---------- save pill ---------- */
+
+.savepill {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: .8125rem;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .22);
+  z-index: 10;
+}
+
+.savepill.bad { background: var(--danger); color: #fff; }
+.savepill button { background: none; border: 0; color: inherit; text-decoration: underline; padding: 0 0 0 8px; font-weight: 600; }
+
+/* ---------- dialogs ---------- */
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 0;
+  background: var(--card);
+  color: var(--ink);
+  width: min(440px, calc(100vw - 32px));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+}
+
+dialog::backdrop { background: rgba(20, 16, 34, .45); }
+dialog form { padding: 22px; display: grid; gap: 14px; }
+dialog h2 { font-size: 1.25rem; }
+dialog h3 { font-size: .9375rem; margin-top: 6px; color: var(--muted); font-weight: 500; }
+
+dialog label { display: grid; gap: 5px; font-size: .8125rem; color: var(--muted); }
+
+dialog input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.dlg-note { margin: -6px 0 0; font-size: .8125rem; color: var(--muted); }
+.dlg-error { margin: 0; font-size: .8125rem; color: var(--danger); font-weight: 600; }
+
+dialog menu { display: flex; gap: 8px; justify-content: flex-end; margin: 6px 0 0; padding: 0; flex-wrap: wrap; }
+dialog menu .danger { margin-right: auto; }
+
+.pick-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.pick-row button {
+  flex: 1 1 90px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 14px 8px;
+  font-family: var(--display);
+  font-weight: 600;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.pick-row button:hover { border-color: var(--kid, var(--ink)); }
+.pick-row .avatar { font-size: 1.5rem; }
+
+.kid-editors { display: grid; gap: 10px; }
+.kid-editors div { display: flex; gap: 8px; align-items: center; }
+.kid-editors input[type="text"] { flex: 1; }
+.kid-editors .emoji { width: 62px; text-align: center; font-size: 1.125rem; flex: 0 0 auto; }
+
+.resets { display: flex; gap: 8px; flex-wrap: wrap; }
+.resets button { flex: 1 1 auto; }
+
+@media (max-width: 420px) {
+  .wordmark { width: 100%; margin-right: 0; }
+  .payday { gap: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
