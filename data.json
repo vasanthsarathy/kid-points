@@ -11,24 +11,24 @@
   "kids": [
     {
       "id": "e",
-      "name": "E",
-      "emoji": "🦊",
+      "name": "Leah",
+      "emoji": "🐈",
       "points": 0,
       "best": 0,
       "streak": 0
     },
     {
       "id": "l",
-      "name": "L",
-      "emoji": "🐼",
+      "name": "Evan",
+      "emoji": "🦊",
       "points": 0,
       "best": 0,
       "streak": 0
     },
     {
       "id": "m",
-      "name": "M",
-      "emoji": "🦖",
+      "name": "Max",
+      "emoji": "🐆",
       "points": 0,
       "best": 0,
       "streak": 0
