@@ -3,7 +3,7 @@
   "config": {
     "centsPerPoint": 25,
     "baselineCents": 1000,
-    "timezone": "America/Los_Angeles"
+    "timezone": "America/New_York"
   },
   "cycle": {
     "startDate": "2026-09-18"
