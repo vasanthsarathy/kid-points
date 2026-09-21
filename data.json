@@ -61,6 +61,11 @@
         "id": "pmubpyiv4",
         "label": "Reading a book during the day for half hour",
         "points": 1
+      },
+      {
+        "id": "pmubpyt8o",
+        "label": "Doing a non-screen activity for half hour",
+        "points": 1
       }
     ],
     "negative": [
