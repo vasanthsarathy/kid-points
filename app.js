@@ -57,18 +57,42 @@ const decodeB64 = b64 =>
 const encodeB64 = text =>
   btoa(String.fromCharCode(...new TextEncoder().encode(text)));
 
-function headers() {
+function headers(token = readToken()) {
   const h = { Accept: 'application/vnd.github+json' };
-  const token = readToken();
   if (token) h.Authorization = `Bearer ${token}`;
   return h;
 }
 
-async function fetchFromApi() {
-  const res = await fetch(`${API}?ref=${REPO.branch}&t=${Date.now()}`, { headers: headers(), cache: 'no-store' });
+async function fetchFromApi({ withToken = true } = {}) {
+  const res = await fetch(`${API}?ref=${REPO.branch}&t=${Date.now()}`, {
+    headers: headers(withToken ? readToken() : ''),
+    cache: 'no-store',
+  });
   if (!res.ok) throw Object.assign(new Error(`read ${res.status}`), { status: res.status });
   const body = await res.json();
   return { state: JSON.parse(decodeB64(body.content)), sha: body.sha };
+}
+
+/**
+ * Say what is wrong with a token, or null if it is good. Checking at the
+ * moment it is pasted beats discovering it days later, when the only symptom
+ * is that changes quietly stop being saved.
+ */
+async function tokenProblem(token) {
+  let res;
+  try {
+    res = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.name}`,
+      { headers: headers(token), cache: 'no-store' });
+  } catch {
+    return 'Could not reach GitHub to check that token. Check your connection and try again.';
+  }
+  if (res.status === 401) return 'GitHub did not accept that token. Check you copied the whole thing.';
+  if (res.status === 404) return `That token cannot see ${REPO.owner}/${REPO.name}. Give it access to that repository.`;
+  if (!res.ok) return `GitHub replied with error ${res.status}.`;
+
+  const repo = await res.json().catch(() => ({}));
+  if (!repo.permissions?.push) return 'That token can only read. Set its Contents permission to Read and write.';
+  return null;
 }
 
 /** Same-origin copy. Can be a few minutes behind, and gives no sha, so no writing. */
@@ -120,17 +144,31 @@ async function load() {
   try {
     result = normalize(await fetchFromApi());
     readOnly = false;
+    note('');
   } catch (apiError) {
-    try {
-      result = normalize(await fetchFromFile());
-      readOnly = true;
-      note(apiError.status === 403
-        ? 'Showing saved scores, and nothing can be changed right now: GitHub is rate limiting this network. Try again in an hour.'
-        : `Showing saved scores, and nothing can be changed right now: GitHub could not be reached${apiError.status ? ` (error ${apiError.status})` : ''}. Check the connection and reload.`);
-    } catch {
-      document.querySelector('main').innerHTML =
-        '<p class="lede">Could not load <b>data.json</b>. Check the <code>REPO</code> settings at the top of app.js, and that the repo is public. The README has the setup steps.</p>';
-      return;
+    // The repo is public, so reading needs no credentials. A token GitHub has
+    // rejected must not be allowed to break a read that would work without it.
+    if (apiError.status === 401 && readToken()) {
+      forgetDevice();
+      try {
+        result = normalize(await fetchFromApi({ withToken: false }));
+        readOnly = false;
+        note('GitHub rejected the token saved on this device, so it has been removed. The scores below are current. Tap Parent and paste a new token before changing anything.');
+      } catch { /* fall through to the file copy */ }
+    }
+
+    if (!result) {
+      try {
+        result = normalize(await fetchFromFile());
+        readOnly = true;
+        note(apiError.status === 403
+          ? 'Showing saved scores, and nothing can be changed right now: GitHub is rate limiting this network. Try again in an hour.'
+          : `Showing saved scores, and nothing can be changed right now: GitHub could not be reached${apiError.status ? ` (error ${apiError.status})` : ''}. Check the connection and reload.`);
+      } catch {
+        document.querySelector('main').innerHTML =
+          '<p class="lede">Could not load <b>data.json</b>. Check the <code>REPO</code> settings at the top of app.js, and that the repo is public. The README has the setup steps.</p>';
+        return;
+      }
     }
   }
 
@@ -650,22 +688,32 @@ $('form-unlock').addEventListener('submit', async event => {
   const password = $('in-pw').value;
 
   if (first) {
+    // Hold the dialog open: the token is checked against GitHub before it is
+    // accepted, so a bad one is caught here rather than days later when the
+    // only symptom is that changes quietly stop saving.
+    event.preventDefault();
+
     const token = $('in-token').value.trim();
-    if (!token || !password) {
-      event.preventDefault();
-      showUnlockError('Both the token and a password are needed.');
-      return;
-    }
+    if (!token || !password) return showUnlockError('Both the token and a password are needed.');
+
+    $('unlock-ok').disabled = true;
+    $('unlock-ok').textContent = 'Checking…';
+    const problem = await tokenProblem(token);
+    $('unlock-ok').disabled = false;
+    $('unlock-ok').textContent = 'Set up';
+    if (problem) return showUnlockError(problem);
+
     localStorage.setItem('kp.token', token);
     localStorage.setItem('kp.pw', await sha256(password));
     unlocked = true;
+    $('dlg-unlock').close('ok');
     load();
     return;
   }
 
   if (await sha256(password) !== readPwHash()) {
     event.preventDefault();
-    showUnlockError('That is not the password.');
+    showUnlockError('That is not the password.', true);
     return;
   }
   unlocked = true;
@@ -681,11 +729,12 @@ $('unlock-forget').addEventListener('click', () => {
   openUnlock();
 });
 
-function showUnlockError(message) {
+function showUnlockError(message, clearPassword = false) {
   $('unlock-error').textContent = message;
   $('unlock-error').hidden = false;
-  $('in-pw').value = '';
-  $('in-pw').focus();
+  // Only wipe the password when the password was the problem; making someone
+  // retype it because their token was wrong is just rude.
+  if (clearPassword) { $('in-pw').value = ''; $('in-pw').focus(); }
 }
 
 function pickKid(kind, behaviorId) {

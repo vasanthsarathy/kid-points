@@ -42,9 +42,15 @@ HTTPS matters rather than being tidiness: the parent password is hashed with
 - Copy the token. GitHub shows it exactly once.
 
 **Unlock the site.** Open the link above, tap **Parent**, paste the token,
-and pick a short password. Both stay in that browser. Do the same on any other
-device you want to change points from. If you ever forget the password, the
-unlock box offers to set the device up again.
+and pick a short password. The token is checked against GitHub before it is
+accepted, so a half-copied or under-permissioned one is caught right there
+instead of silently failing later. Both stay in that browser. Do the same on
+any other device you want to change points from. If you ever forget the
+password, the unlock box offers to set the device up again.
+
+**When a token expires or is revoked,** the site keeps working for the kids —
+reading is public and needs no credentials — and tells you the token was
+rejected. Tap Parent and paste a new one.
 
 **Make it yours.** Tap **Settings** to set the weekly allowance, the rate,
 and the kids' names and emoji, then open **Earn & lose** to edit the two lists.

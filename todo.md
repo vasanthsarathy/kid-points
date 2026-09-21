@@ -185,3 +185,24 @@ Reported from the live site: edits looked applied, then were gone on reload.
 
 Tests: 53 unit, 47 + 38 + 6 headless assertions across three scenarios
 (everyday path, settings and resets, and no connection).
+
+## Round five — a rejected token took the whole site down
+
+Reported from the live site: an edit failed with "no connection to GitHub" and
+the console showed `401` on the read.
+
+The repo is public, so reading needs no credentials at all — but the app
+attached the stored token to every read, and a token GitHub had rejected turned
+a read that would have succeeded anonymously into a hard failure. That dropped
+the page into read-only, which blocked writing too. One bad token took out both
+halves of the app, and the message blamed the connection.
+
+- A read that gets 401 with a token now discards the token and retries without
+  it. The kids' view keeps working, and the banner says the token was rejected
+  and to paste a new one — rather than blaming the network.
+- A pasted token is checked against GitHub before being accepted: not
+  recognised, cannot see the repo, or read-only permission each get their own
+  message, with the dialog held open and the typed password left alone.
+
+Tests: 53 unit, and 47 + 38 + 8 + 16 headless assertions across four scenarios
+(everyday path, settings and resets, no connection, bad tokens).
