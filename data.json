@@ -56,6 +56,11 @@
         "id": "p7",
         "label": "Put your laundry away",
         "points": 2
+      },
+      {
+        "id": "pmubpyiv4",
+        "label": "Reading a book during the day for half hour",
+        "points": 1
       }
     ],
     "negative": [
