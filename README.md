@@ -11,27 +11,26 @@ Weeks run Friday to Thursday and are paid the following Friday. A week you
 haven't handed over yet shows as **still owed**, per kid, so a kid checking on
 a Tuesday knows exactly where they stand.
 
+## The link
+
+**https://vsarathy.com/kid-points/**
+
+That is the one to give the kids. Nothing to install and nothing to log into —
+they just open it.
+
 ---
 
-## Setup, once
+## Setup
 
-**1. Put the files on GitHub.**
+Hosting is already done: the repo is public (which is what lets the kids'
+phones read the scores without credentials) and Pages is serving from `main`
+with HTTPS enforced. The only thing in the repo is first initials, point
+numbers, and the behavior lists.
 
-```bash
-git remote add origin https://github.com/vasanthsarathy/kid-points.git
-git push -u origin main
-```
+HTTPS matters rather than being tidiness: the parent password is hashed with
+`crypto.subtle`, which browsers switch off on a plain `http://` page.
 
-The repo must be **public** — that is what lets the kids' phones read the
-scores without logging in. The only thing in it is first initials, point
-numbers, and your behavior lists.
-
-**2. Turn on Pages.** In the repo: *Settings → Pages → Build and deployment →
-Deploy from a branch → `main` / `(root)` → Save.* A minute later the site is at
-`https://vasanthsarathy.github.io/kid-points/`. That's the link to give the
-kids.
-
-**3. Make a token.** This is what lets your phone write to the file.
+**Make a token.** This is what lets your phone write to the file.
 
 - Go to *GitHub → Settings → Developer settings → Personal access tokens →
   Fine-grained tokens → Generate new token.*
@@ -42,12 +41,12 @@ kids.
   one when it lapses.
 - Copy the token. GitHub shows it exactly once.
 
-**4. Unlock the site.** Open your Pages URL, tap **Parent**, paste the token,
+**Unlock the site.** Open the link above, tap **Parent**, paste the token,
 and pick a short password. Both stay in that browser. Do the same on any other
 device you want to change points from. If you ever forget the password, the
 unlock box offers to set the device up again.
 
-**5. Make it yours.** Tap **Settings** to set the weekly allowance, the rate,
+**Make it yours.** Tap **Settings** to set the weekly allowance, the rate,
 and the kids' names and emoji, then open **Earn & lose** to edit the two lists.
 
 ---
