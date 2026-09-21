@@ -27,6 +27,8 @@ let readOnly = false;            // true when we could not reach the API
 let today = todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone);
 let saveTimer = null;
 let saving = false;
+let saveAgain = false;           // a change arrived while a save was in flight
+let dirty = false;               // base.state differs from what is stored
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -99,6 +101,7 @@ async function putState(state, message) {
 
   const body = await res.json();
   base = { state, sha: body.content.sha };
+  dirty = false;
 }
 
 /* ---------------- loading ---------------- */
@@ -108,8 +111,8 @@ function normalize(loaded) {
   today = todayIn(loaded.state.config.timezone || 'UTC');
   const current = migrate(loaded.state);
   const { state, changed } = rollForward(current, today);
-  const moved = changed || JSON.stringify(current) !== JSON.stringify(loaded.state);
-  return { loaded: { state, sha: loaded.sha }, changed: moved };
+  const rewritten = JSON.stringify(state) !== JSON.stringify(loaded.state);
+  return { loaded: { state, sha: loaded.sha }, changed: changed || rewritten, rewritten };
 }
 
 async function load() {
@@ -122,8 +125,8 @@ async function load() {
       result = normalize(await fetchFromFile());
       readOnly = true;
       note(apiError.status === 403
-        ? 'Showing saved scores. GitHub is rate limiting right now, so this might be a few minutes behind.'
-        : 'Showing saved scores. Could not reach GitHub, so this might be a few minutes behind.');
+        ? 'Showing saved scores, and nothing can be changed right now: GitHub is rate limiting this network. Try again in an hour.'
+        : `Showing saved scores, and nothing can be changed right now: GitHub could not be reached${apiError.status ? ` (error ${apiError.status})` : ''}. Check the connection and reload.`);
     } catch {
       document.querySelector('main').innerHTML =
         '<p class="lede">Could not load <b>data.json</b>. Check the <code>REPO</code> settings at the top of app.js, and that the repo is public. The README has the setup steps.</p>';
@@ -132,10 +135,12 @@ async function load() {
   }
 
   base = result.loaded;
+  dirty = result.rewritten;
   render();
 
-  // A closed week is only real once it is written down.
-  if (result.changed && readToken() && !readOnly) queueSave(0);
+  // A closed week is only real once it is written down — but never write a
+  // file that would come out byte for byte the same.
+  if (dirty && readToken() && !readOnly) queueSave(0);
 }
 
 /* ---------------- saving ---------------- */
@@ -175,7 +180,12 @@ function queueSave(delay = SAVE_DELAY) {
 }
 
 async function save() {
-  if (saving || readOnly || !readToken()) return;
+  if (!canSave()) return;
+  // A save already running used to cancel this one outright, which lost the
+  // change: it stayed in memory, looked applied, and was gone on reload.
+  if (saving) { saveAgain = true; return; }
+  if (!pendingCount(pending) && !dirty) return;
+
   saving = true;
 
   const changes = pending;
@@ -189,7 +199,9 @@ async function save() {
     if (error.conflict) {
       // Someone saved from another device. Rebuild on their copy, keep our taps.
       try {
-        base = normalize(await fetchFromApi()).loaded;
+        const fresh = normalize(await fetchFromApi());
+        base = fresh.loaded;
+        dirty = fresh.rewritten;
         await putState(applyPending(base.state, changes), commitMessage(changes));
         pill('Saved', 1600);
       } catch {
@@ -203,7 +215,25 @@ async function save() {
   } finally {
     saving = false;
     render();
+    if (saveAgain) { saveAgain = false; queueSave(0); }
   }
+}
+
+/**
+ * Whether a write can reach GitHub at all. When it cannot, say so loudly —
+ * silently accepting changes that will never be written is worse than
+ * refusing them, because the screen looks right until the next reload.
+ */
+function canSave() {
+  if (readOnly) {
+    if (pendingCount(pending)) pill('Not saved — no connection to GitHub. Reload to try again.', 0, true);
+    return false;
+  }
+  if (!readToken()) {
+    if (pendingCount(pending)) pill('Not saved — tap Parent and paste your token.', 0, true);
+    return false;
+  }
+  return true;
 }
 
 function restore(changes, message) {

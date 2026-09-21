@@ -161,3 +161,27 @@ fires for a kid who went 40 points under. Marking payments is now a weekly
 chore rather than an occasional one.
 
 Still unverified: how any of it looks. No browser was available.
+
+## Round four — saves that silently vanished
+
+Reported from the live site: edits looked applied, then were gone on reload.
+
+- **A save already in flight cancelled the next one.** `save()` opened with
+  `if (saving) return`, so a change made while a write was in progress was
+  dropped outright — it stayed in memory, the screen looked right, the pill even
+  said "Saved" (from the earlier write), and nothing ever rescheduled it. A
+  queued save now waits and runs after the current one finishes. The regression
+  test fails against the old code with the second change lost.
+- **Read-only mode swallowed edits in silence.** If the load-time read failed,
+  `readOnly` was set and every later save returned immediately with no feedback
+  at all, while the parent controls stayed fully usable. Refusing a change
+  loudly is better than accepting one that can never be written: the pill now
+  says so, and the banner names the actual reason including the HTTP status.
+- **Empty commits on load.** The app rewrote the file whenever migration or
+  rollover *might* have changed something, producing commits with no diff — one
+  is in the deployed history. It now writes only when the result would actually
+  differ from what is stored, tracked by a `dirty` flag rather than re-deriving
+  it, since a closed week lives in `base.state` and not in `pending`.
+
+Tests: 53 unit, 47 + 38 + 6 headless assertions across three scenarios
+(everyday path, settings and resets, and no connection).
