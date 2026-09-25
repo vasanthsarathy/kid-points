@@ -49,8 +49,8 @@
         "l": {
           "points": 6,
           "cents": 1150,
-          "paid": false,
-          "paidOn": null
+          "paid": true,
+          "paidOn": "2026-09-25"
         },
         "m": {
           "points": 7,
