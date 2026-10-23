@@ -130,8 +130,8 @@
         "m": {
           "points": -16,
           "cents": 600,
-          "paid": false,
-          "paidOn": null
+          "paid": true,
+          "paidOn": "2026-10-23"
         }
       }
     },
