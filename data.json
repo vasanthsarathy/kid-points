@@ -155,8 +155,8 @@
         "m": {
           "points": -24,
           "cents": 400,
-          "paid": false,
-          "paidOn": null
+          "paid": true,
+          "paidOn": "2026-10-23"
         }
       }
     }
