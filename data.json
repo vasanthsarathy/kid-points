@@ -143,8 +143,8 @@
         "e": {
           "points": -4,
           "cents": 900,
-          "paid": false,
-          "paidOn": null
+          "paid": true,
+          "paidOn": "2026-10-24"
         },
         "l": {
           "points": 0,
