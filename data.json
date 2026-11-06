@@ -6,14 +6,14 @@
     "timezone": "America/New_York"
   },
   "cycle": {
-    "startDate": "2026-10-30"
+    "startDate": "2026-11-06"
   },
   "kids": [
     {
       "id": "e",
       "name": "Leah",
       "emoji": "🐈",
-      "points": -3,
+      "points": 0,
       "best": 16,
       "streak": 0
     },
@@ -21,15 +21,15 @@
       "id": "l",
       "name": "Evan",
       "emoji": "🦊",
-      "points": 12,
-      "best": 6,
-      "streak": 1
+      "points": 0,
+      "best": 12,
+      "streak": 2
     },
     {
       "id": "m",
       "name": "Max",
       "emoji": "🐆",
-      "points": -30,
+      "points": 0,
       "best": 7,
       "streak": 0
     }
@@ -182,6 +182,31 @@
           "cents": 875,
           "paid": true,
           "paidOn": "2026-10-30"
+        }
+      }
+    },
+    {
+      "id": "2026-11-06",
+      "weekStart": "2026-10-30",
+      "weekEnd": "2026-11-05",
+      "kids": {
+        "e": {
+          "points": -3,
+          "cents": 925,
+          "paid": false,
+          "paidOn": null
+        },
+        "l": {
+          "points": 12,
+          "cents": 1300,
+          "paid": false,
+          "paidOn": null
+        },
+        "m": {
+          "points": -30,
+          "cents": 250,
+          "paid": false,
+          "paidOn": null
         }
       }
     }
