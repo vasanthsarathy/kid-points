@@ -6,7 +6,7 @@
     "timezone": "America/New_York"
   },
   "cycle": {
-    "startDate": "2026-11-20"
+    "startDate": "2026-11-27"
   },
   "kids": [
     {
@@ -15,7 +15,7 @@
       "emoji": "🐈",
       "points": 0,
       "best": 16,
-      "streak": 2
+      "streak": 0
     },
     {
       "id": "l",
@@ -29,9 +29,9 @@
       "id": "m",
       "name": "Max",
       "emoji": "🐆",
-      "points": 5,
+      "points": 0,
       "best": 7,
-      "streak": 0
+      "streak": 1
     }
   ],
   "payouts": [
@@ -257,6 +257,31 @@
           "cents": 1000,
           "paid": true,
           "paidOn": "2026-11-22"
+        }
+      }
+    },
+    {
+      "id": "2026-11-27",
+      "weekStart": "2026-11-20",
+      "weekEnd": "2026-11-26",
+      "kids": {
+        "e": {
+          "points": 0,
+          "cents": 1000,
+          "paid": false,
+          "paidOn": null
+        },
+        "l": {
+          "points": 0,
+          "cents": 1000,
+          "paid": false,
+          "paidOn": null
+        },
+        "m": {
+          "points": 5,
+          "cents": 1125,
+          "paid": false,
+          "paidOn": null
         }
       }
     }
